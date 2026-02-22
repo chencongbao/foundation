@@ -1,8 +1,8 @@
 <?php
 
-namespace Bob\Foundation\Models;
+namespace Chencongbao\Foundation\Models;
 
-use Bob\Foundation\Traits\ModelTraits;
+use Chencongbao\Foundation\Traits\ModelTraits;
 use Illuminate\Database\Eloquent\Model;
 
 class AdminSetting extends Model

@@ -1,8 +1,8 @@
 <?php
 
-namespace Bob\Foundation\Services\Config;
+namespace Chencongbao\Foundation\Services\Config;
 
-use Bob\Foundation\Services\Const\CacheConstPrefixService;
+use Chencongbao\Foundation\Services\Const\CacheConstPrefixService;
 use Illuminate\Support\Facades\Cache;
 
 class CacheAdminSettingService

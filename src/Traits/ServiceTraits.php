@@ -1,5 +1,5 @@
 <?php
-namespace Bob\Foundation\Traits;
+namespace Chencongbao\Foundation\Traits;
 
 
 trait ServiceTraits

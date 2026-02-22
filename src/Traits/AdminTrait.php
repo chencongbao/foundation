@@ -1,5 +1,5 @@
 <?php
-namespace Bob\Foundation\Traits;
+namespace Chencongbao\Foundation\Traits;
 
 use Dcat\Admin\Http\Auth\Permission;
 use Dcat\Admin\Layout\Content;
