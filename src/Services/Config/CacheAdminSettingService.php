@@ -2,6 +2,7 @@
 
 namespace Chencongbao\Foundation\Services\Config;
 
+use Chencongbao\Foundation\Models\AdminSetting;
 use Chencongbao\Foundation\Services\Const\CacheConstPrefixService;
 use Illuminate\Support\Facades\Cache;
 
