@@ -1,5 +1,5 @@
 <?php
-
+namespace Bob\Foundation\Traits;
 
 
 trait ServiceTraits

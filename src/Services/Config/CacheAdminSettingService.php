@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Services\Cache\Config;
+namespace Bob\Foundation\Services\Config;
 
-use App\Models\AdminSetting;
-use App\Services\Cache\CacheConstPrefixService;
+use Bob\Foundation\Services\Const\CacheConstPrefixService;
 use Illuminate\Support\Facades\Cache;
 
 class CacheAdminSettingService

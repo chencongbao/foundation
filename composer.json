@@ -1,5 +1,5 @@
 {
-    "name": "chencongbao/foundation",
+    "name": "bob/foundation",
     "description": "Bob common foundation package",
     "type": "library",
     "license": "MIT",
@@ -12,10 +12,5 @@
         ]
     },
     "extra": {
-        "laravel": {
-            "providers": [
-                "Bob\\Foundation\\FoundationServiceProvider"
-            ]
-        }
     }
 }

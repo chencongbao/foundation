@@ -1,5 +1,5 @@
 <?php
-
+namespace Bob\Foundation\Traits;
 
 
 use Dcat\Admin\Traits\HasDateTimeFormatter;

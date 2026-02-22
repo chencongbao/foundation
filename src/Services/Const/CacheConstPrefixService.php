@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Cache\Const;
+namespace Bob\Foundation\Services\Const;
 
 class CacheConstPrefixService
 {
