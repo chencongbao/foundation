@@ -1,0 +1,21 @@
+{
+    "name": "chencongbao/foundation",
+    "description": "Bob common foundation package",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Bob\\Foundation\\": "src/"
+        },
+        "files": [
+            "src/Functions/helpers.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Bob\\Foundation\\FoundationServiceProvider"
+            ]
+        }
+    }
+}
