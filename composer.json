@@ -3,14 +3,42 @@
     "description": "chencongbao common foundation package",
     "type": "library",
     "license": "MIT",
+    "require": {
+        "php": "^8.0.2",
+        "guzzlehttp/guzzle": "^7.2",
+        "illuminate/support": "^9.19"
+    },
     "autoload": {
         "psr-4": {
             "Chencongbao\\Foundation\\": "src/"
         },
         "files": [
-            "src/Functions/helpers.php"
+            "src/Functions/helpers.php",
+            "src/Functions/string.php",
+            "src/Functions/array.php",
+            "src/Functions/request.php"
         ]
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Chencongbao\\Foundation\\Tests\\": "tests/"
+        }
+    },
+    "require-dev": {
+        "orchestra/testbench": "^7.0",
+        "phpunit/phpunit": "^9.5"
+    },
     "extra": {
+        "laravel": {
+            "providers": [
+                "Chencongbao\\Foundation\\FoundationServiceProvider"
+            ],
+            "aliases": {
+                "TronRpc": "Chencongbao\\Foundation\\Facades\\TronRpc"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true
     }
 }
