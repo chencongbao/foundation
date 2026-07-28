@@ -10,3 +10,4 @@ HTTP 相关代码位于 `src/Http/`：
 FormRequest 中。
 
 代理 IP、安全头和鉴权规则必须由宿主项目明确配置，不能默认信任客户端传入的请求头。
+Foundation 的 CDN IP 解析器说明见[客户端 IP 解析](client-ip.md)。

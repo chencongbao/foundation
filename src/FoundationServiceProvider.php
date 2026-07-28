@@ -4,6 +4,8 @@ namespace Chencongbao\Foundation;
 
 use Illuminate\Support\ServiceProvider;
 use Chencongbao\Foundation\Services\Tron\TronRpcClient;
+use Chencongbao\Foundation\Contracts\ClientIpResolver;
+use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
 
 /**
  * 注册 foundation 包提供的共享基础服务。
@@ -17,6 +19,10 @@ class FoundationServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/foundation.php', 'foundation');
         $this->mergeConfigFrom(__DIR__.'/../config/tron_rpc.php', 'tron_rpc');
+
+        $this->app->singleton(ClientIpResolver::class, static fn ($app): ClientIpResolver => new TrustedProxyClientIpResolver(
+            (array) $app['config']->get('foundation.client_ip', [])
+        ));
 
         $this->app->singleton(TronRpcClient::class, static fn ($app): TronRpcClient => new TronRpcClient(
             (array) $app['config']->get('tron_rpc.endpoints', []),

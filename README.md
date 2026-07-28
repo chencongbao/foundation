@@ -85,8 +85,11 @@ $balance = TronRpc::addressBalance($address);
 ```php
 use Chencongbao\Foundation\Services\Tron\TronRpcClient;
 
-public function __construct(private readonly TronRpcClient $tronRpc)
+private TronRpcClient $tronRpc;
+
+public function __construct(TronRpcClient $tronRpc)
 {
+    $this->tronRpc = $tronRpc;
 }
 ```
 

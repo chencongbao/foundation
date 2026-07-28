@@ -14,9 +14,16 @@ use RuntimeException;
  */
 class TronRpcException extends RuntimeException
 {
-    public function __construct(string $message, int $rpcCode = -32098, private readonly int $httpStatus = 0, private readonly array $rpcData = [], private readonly bool $retryable = false, ?Throwable $previous = null)
+    private int $httpStatus;
+    private array $rpcData;
+    private bool $retryable;
+
+    public function __construct(string $message, int $rpcCode = -32098, int $httpStatus = 0, array $rpcData = [], bool $retryable = false, ?Throwable $previous = null)
     {
         parent::__construct($message, $rpcCode, $previous);
+        $this->httpStatus = $httpStatus;
+        $this->rpcData = $rpcData;
+        $this->retryable = $retryable;
     }
 
     public function httpStatus(): int

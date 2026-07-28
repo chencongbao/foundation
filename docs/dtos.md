@@ -2,15 +2,20 @@
 
 `src/DTOs/` 放跨层传递的结构化数据，替代键名不明确的关联数组。
 
-DTO 建议使用 `final readonly class`，通过构造函数声明字段和类型：
+PHP 8.0 使用 `final class` 和类型属性，通过构造函数完成赋值：
 
 ```php
-final readonly class PageResult
+final class PageResult
 {
+    public array $items;
+    public int $total;
+
     public function __construct(
-        public array $items,
-        public int $total,
+        array $items,
+        int $total,
     ) {
+        $this->items = $items;
+        $this->total = $total;
     }
 }
 ```

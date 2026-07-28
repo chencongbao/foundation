@@ -25,9 +25,17 @@ class TronRpcClient
     private array $endpoints;
 
     private ClientInterface $httpClient;
+    private string $appId;
+    private string $secret;
+    private float $connectTimeoutSeconds;
+    private float $requestTimeoutSeconds;
 
-    public function __construct(array $endpoints, private readonly string $appId, private readonly string $secret, private readonly float $connectTimeoutSeconds = 1.0, private readonly float $requestTimeoutSeconds = 3.0, ?ClientInterface $httpClient = null)
+    public function __construct(array $endpoints, string $appId, string $secret, float $connectTimeoutSeconds = 1.0, float $requestTimeoutSeconds = 3.0, ?ClientInterface $httpClient = null)
     {
+        $this->appId = $appId;
+        $this->secret = $secret;
+        $this->connectTimeoutSeconds = $connectTimeoutSeconds;
+        $this->requestTimeoutSeconds = $requestTimeoutSeconds;
         $this->endpoints = $this->normalizeEndpoints($endpoints);
         if ($this->endpoints === []) {
             throw new InvalidArgumentException('TRON RPC endpoints 未配置。');

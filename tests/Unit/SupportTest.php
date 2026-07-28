@@ -2,9 +2,9 @@
 
 namespace Chencongbao\Foundation\Tests\Unit;
 
+use PHPUnit\Framework\TestCase;
 use Chencongbao\Foundation\Support\Money;
 use Chencongbao\Foundation\Support\Tree;
-use Chencongbao\Foundation\Tests\TestCase;
 
 class SupportTest extends TestCase
 {

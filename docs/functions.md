@@ -12,3 +12,10 @@
 
 这些文件通过 Composer `autoload.files` 自动加载，新增文件后需要执行
 `composer dump-autoload`。
+
+请求 IP：
+
+- `bob_client_ip()`：返回客户端 IP；
+- `bob_client_ip_info()`：返回来源、请求头、入口节点、域名和可信状态。
+
+详细配置见[客户端 IP 解析](client-ip.md)。
