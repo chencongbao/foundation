@@ -18,10 +18,11 @@ class FoundationServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/foundation.php', 'foundation');
+        $this->mergeConfigFrom(__DIR__.'/../config/client_ip.php', 'client_ip');
         $this->mergeConfigFrom(__DIR__.'/../config/tron_rpc.php', 'tron_rpc');
 
         $this->app->singleton(ClientIpResolver::class, static fn ($app): ClientIpResolver => new TrustedProxyClientIpResolver(
-            (array) $app['config']->get('foundation.client_ip', [])
+            (array) $app['config']->get('client_ip', [])
         ));
 
         $this->app->singleton(TronRpcClient::class, static fn ($app): TronRpcClient => new TronRpcClient(
@@ -36,6 +37,7 @@ class FoundationServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([__DIR__.'/../config/foundation.php' => config_path('foundation.php')], 'foundation-config');
+        $this->publishes([__DIR__.'/../config/client_ip.php' => config_path('client_ip.php')], 'foundation-client-ip-config');
         $this->publishes([__DIR__.'/../config/tron_rpc.php' => config_path('tron_rpc.php')], 'foundation-tron-rpc-config');
     }
 }

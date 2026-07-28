@@ -3,6 +3,7 @@
 namespace Chencongbao\Foundation\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Chencongbao\Foundation\Support\ConfigList;
 use Chencongbao\Foundation\Support\Money;
 use Chencongbao\Foundation\Support\Tree;
 
@@ -22,5 +23,13 @@ class SupportTest extends TestCase
         ]);
 
         $this->assertSame('child', $tree[0]['children'][0]['name']);
+    }
+
+    public function test_it_converts_a_comma_separated_config_value_to_a_list(): void
+    {
+        $this->assertSame(
+            ['api.example.com', '*.example.com'],
+            ConfigList::fromCommaSeparated(' api.example.com, ,*.example.com,api.example.com ')
+        );
     }
 }

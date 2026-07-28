@@ -87,7 +87,7 @@ FOUNDATION_ALIBABA_CDN_PROXIES=192.0.2.10,192.0.2.0/24
 
 ## 自定义节点
 
-在 `foundation.client_ip.nodes` 中追加：
+在 `client_ip.nodes` 中追加：
 
 ```php
 'internal_gateway' => [
@@ -112,11 +112,19 @@ FOUNDATION_WAF_ENABLED=true
 FOUNDATION_WAF_NAME=Luckypay WAF
 FOUNDATION_WAF_DOMAINS=pay.example.com,admin.example.com
 FOUNDATION_WAF_HEADERS=X-Real-IP
-FOUNDATION_WAF_PROXIES=10.20.1.8,10.20.0.0/16
+FOUNDATION_WAF_PROXIES=203.0.113.10,203.0.113.0/24
 ```
 
-`FOUNDATION_WAF_PROXIES` 必须填写 WAF 或反向代理连接源站时使用的真实节点 IP。不能填写
-`0.0.0.0/0`，也不能只根据开关直接信任 `X-Real-IP`。
+`custom_waf` 已内置 94 个可信 IPv4、IPv6 节点或网段。`FOUNDATION_WAF_PROXIES` 用于
+继续追加后续节点。不能追加 `0.0.0.0/0`，也不能只根据开关直接信任 `X-Real-IP`。
+
+发布独立配置文件：
+
+```bash
+php artisan vendor:publish --tag=foundation-client-ip-config
+```
+
+发布后配置位于宿主项目的 `config/client_ip.php`。
 
 完整判断顺序：
 
