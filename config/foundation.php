@@ -63,6 +63,16 @@ return [
                 // 阿里 CDN 回源 IP 动态分配，需按控制台/API 结果补充可信网段。
                 'proxies' => $csv((string) env('FOUNDATION_ALIBABA_CDN_PROXIES', '')),
             ],
+
+            'custom_waf' => [
+                'name' => (string) env('FOUNDATION_WAF_NAME', 'Custom WAF'),
+                'type' => 'custom_proxy',
+                'enabled' => (bool) env('FOUNDATION_WAF_ENABLED', false),
+                'domains' => $csv((string) env('FOUNDATION_WAF_DOMAINS', '')),
+                'headers' => $csv((string) env('FOUNDATION_WAF_HEADERS', 'X-Real-IP')),
+                // 必须填写真实 WAF/反向代理回源节点 IP，不能使用 0.0.0.0/0。
+                'proxies' => $csv((string) env('FOUNDATION_WAF_PROXIES', '')),
+            ],
         ],
     ],
 ];

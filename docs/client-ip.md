@@ -103,6 +103,21 @@ FOUNDATION_ALIBABA_CDN_PROXIES=192.0.2.10,192.0.2.0/24
 节点按照配置顺序匹配。`REMOTE_ADDR` 必须命中 `proxies`，解析器才会读取该节点的
 Header，防止客户端伪造 CDN Header。
 
+### 通用 WAF 配置
+
+Foundation 已预留一个 `custom_waf` 节点，适合读取 `X-Real-IP`：
+
+```dotenv
+FOUNDATION_WAF_ENABLED=true
+FOUNDATION_WAF_NAME=Luckypay WAF
+FOUNDATION_WAF_DOMAINS=pay.example.com,admin.example.com
+FOUNDATION_WAF_HEADERS=X-Real-IP
+FOUNDATION_WAF_PROXIES=10.20.1.8,10.20.0.0/16
+```
+
+`FOUNDATION_WAF_PROXIES` 必须填写 WAF 或反向代理连接源站时使用的真实节点 IP。不能填写
+`0.0.0.0/0`，也不能只根据开关直接信任 `X-Real-IP`。
+
 完整判断顺序：
 
 ```text

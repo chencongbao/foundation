@@ -91,6 +91,33 @@ class TrustedProxyClientIpResolverTest extends TestCase
         $this->assertSame(ClientIpSource::Direct, $result->source);
     }
 
+    public function test_it_supports_a_custom_waf_using_x_real_ip(): void
+    {
+        $resolver = new TrustedProxyClientIpResolver([
+            'nodes' => [
+                'luckypay_waf' => [
+                    'name' => 'Luckypay WAF',
+                    'type' => 'custom_proxy',
+                    'enabled' => true,
+                    'domains' => ['pay.example.com'],
+                    'headers' => ['X-Real-IP'],
+                    'proxies' => ['10.20.0.0/16'],
+                ],
+            ],
+        ]);
+
+        $result = $resolver->resolve($this->request(
+            '10.20.1.8',
+            'pay.example.com',
+            ['HTTP_X_REAL_IP' => '203.0.113.88']
+        ));
+
+        $this->assertSame('203.0.113.88', $result->ip);
+        $this->assertSame(ClientIpSource::CustomProxy, $result->source);
+        $this->assertSame('luckypay_waf', $result->node);
+        $this->assertSame('X-Real-IP', $result->header);
+    }
+
     private function resolver(array $overrides = []): TrustedProxyClientIpResolver
     {
         return new TrustedProxyClientIpResolver(array_replace_recursive([
