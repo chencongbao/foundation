@@ -2,10 +2,15 @@
 
 namespace Chencongbao\Foundation;
 
+use GuzzleHttp\Client;
+use Illuminate\Log\LogManager;
 use Illuminate\Support\ServiceProvider;
 use Chencongbao\Foundation\Services\Tron\TronRpcClient;
 use Chencongbao\Foundation\Contracts\ClientIpResolver;
+use Chencongbao\Foundation\Contracts\ExceptionNotifier;
+use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
+use Chencongbao\Foundation\Services\Notification\TelegramExceptionNotifier;
 
 /**
  * 注册 foundation 包提供的共享基础服务。
@@ -19,10 +24,23 @@ class FoundationServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/foundation.php', 'foundation');
         $this->mergeConfigFrom(__DIR__.'/../config/client_ip.php', 'client_ip');
+        $this->mergeConfigFrom(__DIR__.'/../config/foundation_log.php', 'foundation_log');
         $this->mergeConfigFrom(__DIR__.'/../config/tron_rpc.php', 'tron_rpc');
 
         $this->app->singleton(ClientIpResolver::class, static fn ($app): ClientIpResolver => new TrustedProxyClientIpResolver(
-            (array) $app['config']->get('client_ip', [])
+            (array) $app['config']->get('client_ip', []),
+            $app->make(FoundationLogger::class)
+        ));
+
+        $this->app->singleton(ExceptionNotifier::class, static fn ($app): ExceptionNotifier => new TelegramExceptionNotifier(
+            new Client(),
+            (array) $app['config']->get('foundation_log.telegram', [])
+        ));
+
+        $this->app->singleton(FoundationLogger::class, static fn ($app): FoundationLogger => new FoundationLogger(
+            $app->make(LogManager::class),
+            $app->make(ExceptionNotifier::class),
+            (array) $app['config']->get('foundation_log', [])
         ));
 
         $this->app->singleton(TronRpcClient::class, static fn ($app): TronRpcClient => new TronRpcClient(
@@ -31,6 +49,8 @@ class FoundationServiceProvider extends ServiceProvider
             (string) $app['config']->get('tron_rpc.secret', ''),
             (float) $app['config']->get('tron_rpc.connect_timeout_seconds', 1),
             (float) $app['config']->get('tron_rpc.request_timeout_seconds', 3),
+            null,
+            $app->make(FoundationLogger::class)
         ));
     }
 
@@ -38,6 +58,7 @@ class FoundationServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__.'/../config/foundation.php' => config_path('foundation.php')], 'foundation-config');
         $this->publishes([__DIR__.'/../config/client_ip.php' => config_path('client_ip.php')], 'foundation-client-ip-config');
+        $this->publishes([__DIR__.'/../config/foundation_log.php' => config_path('foundation_log.php')], 'foundation-log-config');
         $this->publishes([__DIR__.'/../config/tron_rpc.php' => config_path('tron_rpc.php')], 'foundation-tron-rpc-config');
     }
 }

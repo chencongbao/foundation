@@ -2,6 +2,7 @@
 
 namespace Chencongbao\Foundation\Services\Tron;
 
+use Throwable;
 use JsonException;
 use GuzzleHttp\Client;
 use InvalidArgumentException;
@@ -9,6 +10,7 @@ use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use Chencongbao\Foundation\Exceptions\TronRpcException;
+use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 
 /**
  * TRON 内网 JSON-RPC 客户端。
@@ -29,13 +31,15 @@ class TronRpcClient
     private string $secret;
     private float $connectTimeoutSeconds;
     private float $requestTimeoutSeconds;
+    private ?FoundationLogger $logger;
 
-    public function __construct(array $endpoints, string $appId, string $secret, float $connectTimeoutSeconds = 1.0, float $requestTimeoutSeconds = 3.0, ?ClientInterface $httpClient = null)
+    public function __construct(array $endpoints, string $appId, string $secret, float $connectTimeoutSeconds = 1.0, float $requestTimeoutSeconds = 3.0, ?ClientInterface $httpClient = null, ?FoundationLogger $logger = null)
     {
         $this->appId = $appId;
         $this->secret = $secret;
         $this->connectTimeoutSeconds = $connectTimeoutSeconds;
         $this->requestTimeoutSeconds = $requestTimeoutSeconds;
+        $this->logger = $logger;
         $this->endpoints = $this->normalizeEndpoints($endpoints);
         if ($this->endpoints === []) {
             throw new InvalidArgumentException('TRON RPC endpoints 未配置。');
@@ -69,6 +73,11 @@ class TronRpcClient
         $id = bin2hex(random_bytes(16));
         $body = json_encode(['jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $lastException = null;
+        $this->writeLog('debug', 'RPC 请求开始', [
+            'request_id' => $id,
+            'method' => $method,
+            'params' => $params,
+        ]);
 
         // 每次调用从下一个节点开始，在长期运行的 Worker 中均匀使用节点，同时保留单次请求的确定性切换顺序。
         foreach ($this->orderedEndpoints() as $endpoint) {
@@ -81,6 +90,12 @@ class TronRpcClient
                     'headers' => $this->signedHeaders($body),
                 ]);
                 $status = $response->getStatusCode();
+                $this->writeLog('debug', 'RPC 节点响应', [
+                    'request_id' => $id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'http_status' => $status,
+                ]);
                 $payload = $this->decodeResponse((string) $response->getBody(), $status, $id);
                 if ($status >= 500) {
                     $lastException = $this->responseException($payload, $status, true);
@@ -94,23 +109,58 @@ class TronRpcClient
                     throw new TronRpcException('TRON RPC 请求失败。', -32097, $status);
                 }
 
+                $this->writeLog('info', 'RPC 请求成功', [
+                    'request_id' => $id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'http_status' => $status,
+                ]);
+
                 return $payload['result'] ?? null;
             } catch (ConnectException $exception) {
                 $lastException = $exception;
+                $this->writeLog('warning', 'RPC 节点连接失败', [
+                    'request_id' => $id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'message' => $exception->getMessage(),
+                ]);
             } catch (RequestException $exception) {
                 if ($exception->getResponse() !== null && $exception->getResponse()->getStatusCode() < 500) {
-                    throw new TronRpcException('TRON RPC 请求失败。', -32097, $exception->getResponse()->getStatusCode(), [], false, $exception);
+                    $rpcException = new TronRpcException('TRON RPC 请求失败。', -32097, $exception->getResponse()->getStatusCode(), [], false, $exception);
+                    $this->writeException($rpcException, $id, $method, $endpoint);
+
+                    throw $rpcException;
                 }
                 $lastException = $exception;
+                $this->writeLog('warning', 'RPC 节点请求失败', [
+                    'request_id' => $id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'message' => $exception->getMessage(),
+                ]);
             } catch (TronRpcException $exception) {
                 if (!$exception->retryable()) {
+                    $this->writeException($exception, $id, $method, $endpoint);
+
                     throw $exception;
                 }
                 $lastException = $exception;
+                $this->writeLog('warning', 'RPC 节点返回可重试错误', [
+                    'request_id' => $id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'rpc_code' => $exception->getCode(),
+                    'http_status' => $exception->httpStatus(),
+                    'message' => $exception->getMessage(),
+                ]);
             }
         }
 
-        throw new TronRpcException('所有 TRON RPC 节点当前均不可用。', -32098, 503, [], true, $lastException);
+        $exception = new TronRpcException('所有 TRON RPC 节点当前均不可用。', -32098, 503, [], true, $lastException);
+        $this->writeException($exception, $id, $method, null);
+
+        throw $exception;
     }
 
     public function health(): array
@@ -264,6 +314,39 @@ class TronRpcClient
     private function withoutNulls(array $params): array
     {
         return array_filter($params, static fn (mixed $value): bool => $value !== null);
+    }
+
+    private function writeLog(string $level, string $message, array $context): void
+    {
+        if ($this->logger === null) {
+            return;
+        }
+
+        try {
+            $this->logger->log('tron_rpc', $level, $message, $context);
+        } catch (Throwable) {
+            // 日志故障不能改变 RPC 调用结果。
+        }
+    }
+
+    private function writeException(TronRpcException $exception, string $requestId, string $method, ?string $endpoint): void
+    {
+        if ($this->logger === null) {
+            return;
+        }
+
+        try {
+            $this->logger->exception('tron_rpc', $exception, $this->withoutNulls([
+                'request_id' => $requestId,
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'rpc_code' => $exception->getCode(),
+                'http_status' => $exception->httpStatus(),
+                'retryable' => $exception->retryable(),
+            ]));
+        } catch (Throwable) {
+            // 日志或通知故障不能改变 RPC 调用结果。
+        }
     }
 
     /**

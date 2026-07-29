@@ -8,14 +8,17 @@ use Symfony\Component\HttpFoundation\IpUtils;
 use Chencongbao\Foundation\DTOs\ClientIpInfo;
 use Chencongbao\Foundation\Enums\ClientIpSource;
 use Chencongbao\Foundation\Contracts\ClientIpResolver;
+use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 
 final class TrustedProxyClientIpResolver implements ClientIpResolver
 {
     private array $config;
+    private ?FoundationLogger $logger;
 
-    public function __construct(array $config)
+    public function __construct(array $config, ?FoundationLogger $logger = null)
     {
         $this->config = $config;
+        $this->logger = $logger;
     }
 
     public function resolve(?Request $request = null): ClientIpInfo
@@ -42,7 +45,7 @@ final class TrustedProxyClientIpResolver implements ClientIpResolver
                     continue;
                 }
 
-                return new ClientIpInfo(
+                return $this->result(new ClientIpInfo(
                     $ip,
                     ClientIpSource::fromNodeType((string) ($settings['type'] ?? $node)),
                     (string) $header,
@@ -50,12 +53,12 @@ final class TrustedProxyClientIpResolver implements ClientIpResolver
                     $host,
                     (string) $node,
                     isset($settings['name']) ? (string) $settings['name'] : null,
-                    true,
-                );
+                    true
+                ));
             }
         }
 
-        return new ClientIpInfo(
+        return $this->result(new ClientIpInfo(
             $remoteAddress,
             ClientIpSource::Direct,
             null,
@@ -63,8 +66,8 @@ final class TrustedProxyClientIpResolver implements ClientIpResolver
             $host,
             null,
             null,
-            false,
-        );
+            false
+        ));
     }
 
     private function isTrustedProxy(?string $remoteAddress, array $proxies): bool
@@ -136,5 +139,14 @@ final class TrustedProxyClientIpResolver implements ClientIpResolver
         }
 
         return false;
+    }
+
+    private function result(ClientIpInfo $result): ClientIpInfo
+    {
+        if ($this->logger !== null) {
+            $this->logger->info('client_ip', '客户端 IP 解析完成', $result->toArray());
+        }
+
+        return $result;
     }
 }

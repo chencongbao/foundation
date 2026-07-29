@@ -4,6 +4,7 @@
 
 - `foundation.php`：包级通用配置。
 - `client_ip.php`：客户端 IP、CDN 域名和可信节点配置。
+- `foundation_log.php`：模块日志和 Telegram 异常通知配置。
 - 独立服务使用单独配置，例如 `tron_rpc.php`。
 - 环境变量只在配置文件中读取，业务类统一使用 `config()` 或配置仓库。
 - 配置键应带包或模块前缀，避免与宿主项目冲突。

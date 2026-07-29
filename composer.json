@@ -7,6 +7,7 @@
         "php": "^8.0.2",
         "guzzlehttp/guzzle": "^7.2",
         "illuminate/http": "^9.19",
+        "illuminate/log": "^9.19",
         "illuminate/support": "^9.19"
     },
     "autoload": {
@@ -26,6 +27,7 @@
         }
     },
     "require-dev": {
+        "mockery/mockery": "^1.4",
         "orchestra/testbench": "^7.0",
         "phpunit/phpunit": "^9.5"
     },
@@ -35,6 +37,7 @@
                 "Chencongbao\\Foundation\\FoundationServiceProvider"
             ],
             "aliases": {
+                "FoundationLog": "Chencongbao\\Foundation\\Facades\\FoundationLog",
                 "TronRpc": "Chencongbao\\Foundation\\Facades\\TronRpc"
             }
         }
