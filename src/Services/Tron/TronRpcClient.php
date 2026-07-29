@@ -128,9 +128,43 @@ class TronRpcClient
         return (array) $this->call('tron.transaction.getChainDetail', ['tx_id' => $txId]);
     }
 
-    public function transactionsByAddress(string $address, string $direction = 'all', ?int $type = null, int $limit = 20, ?string $cursor = null): array
+    public function transactionsByAddress(string $address, string $direction = 'all', ?int $type = null, int $limit = 20, ?string $cursor = null, ?string $contractAddress = null): array
     {
-        return (array) $this->call('tron.transaction.listByAddress', array_filter(['address' => $address, 'direction' => $direction, 'type' => $type, 'limit' => $limit, 'cursor' => $cursor], static fn (mixed $value): bool => $value !== null));
+        return (array) $this->call('tron.transaction.listByAddress', $this->withoutNulls([
+            'address' => $address,
+            'direction' => $direction,
+            'type' => $type,
+            'limit' => $limit,
+            'cursor' => $cursor,
+            'contract_address' => $contractAddress,
+        ]));
+    }
+
+    public function localTransactionsByAddress(string $address, string $direction = 'all', ?int $type = null, int $limit = 20, ?string $cursor = null, ?string $contractAddress = null): array
+    {
+        return (array) $this->call('tron.transaction.listLocalByAddress', $this->withoutNulls([
+            'address' => $address,
+            'direction' => $direction,
+            'type' => $type,
+            'limit' => $limit,
+            'cursor' => $cursor,
+            'contract_address' => $contractAddress,
+        ]));
+    }
+
+    public function transactionsSince(?int $sinceTimestampMs = null, ?string $cursor = null, ?string $contractAddress = null, ?string $address = null, int $limit = 100): array
+    {
+        return (array) $this->call('tron.transaction.listSince', $this->eventParams($sinceTimestampMs, $cursor, $contractAddress, $address, $limit));
+    }
+
+    public function events(?int $sinceTimestampMs = null, ?string $cursor = null, ?string $contractAddress = null, ?string $address = null, int $limit = 100): array
+    {
+        return (array) $this->call('tron.event.list', $this->eventParams($sinceTimestampMs, $cursor, $contractAddress, $address, $limit));
+    }
+
+    public function transferEvents(?int $sinceTimestampMs = null, ?string $cursor = null, ?string $contractAddress = null, ?string $address = null, int $limit = 100): array
+    {
+        return (array) $this->call('tron.contract.transferEvents', $this->eventParams($sinceTimestampMs, $cursor, $contractAddress, $address, $limit));
     }
 
     public function findPayment(array $criteria): array
@@ -138,9 +172,26 @@ class TronRpcClient
         return (array) $this->call('tron.payment.find', $criteria);
     }
 
-    public function addressBalance(string $address, string $asset = 'all'): array
+    public function paymentExistsAfter(array $criteria): array
     {
-        return (array) $this->call('tron.address.balance', ['address' => $address, 'asset' => $asset]);
+        return (array) $this->call('tron.payment.existsAfter', $criteria);
+    }
+
+    public function addressBalance(string $address, string $asset = 'all', ?string $contractAddress = null): array
+    {
+        return (array) $this->call('tron.address.balance', $this->withoutNulls([
+            'address' => $address,
+            'asset' => $asset,
+            'contract_address' => $contractAddress,
+        ]));
+    }
+
+    public function assetSummary(string $address, ?string $contractAddress = null): array
+    {
+        return (array) $this->call('tron.address.assetSummary', $this->withoutNulls([
+            'address' => $address,
+            'contract_address' => $contractAddress,
+        ]));
     }
 
     /**
@@ -197,6 +248,22 @@ class TronRpcClient
         $error = is_array($payload['error'] ?? null) ? $payload['error'] : [];
 
         return new TronRpcException((string) ($error['message'] ?? 'TRON RPC 服务异常。'), (int) ($error['code'] ?? -32603), $status, is_array($error['data'] ?? null) ? $error['data'] : [], $retryable);
+    }
+
+    private function eventParams(?int $sinceTimestampMs, ?string $cursor, ?string $contractAddress, ?string $address, int $limit): array
+    {
+        return $this->withoutNulls([
+            'since_timestamp_ms' => $sinceTimestampMs,
+            'cursor' => $cursor,
+            'contract_address' => $contractAddress,
+            'address' => $address,
+            'limit' => $limit,
+        ]);
+    }
+
+    private function withoutNulls(array $params): array
+    {
+        return array_filter($params, static fn (mixed $value): bool => $value !== null);
     }
 
     /**
