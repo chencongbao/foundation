@@ -22,7 +22,7 @@ return [
                 'name' => 'Cloudflare',
                 'type' => 'cloudflare',
                 'enabled' => (bool) env('FOUNDATION_CLOUDFLARE_ENABLED', false),
-                'domains' => ConfigList::fromCommaSeparated((string) env('FOUNDATION_CLOUDFLARE_DOMAINS', '')),
+                'domains' => ConfigList::fromCommaSeparated((string) env('FOUNDATION_CLOUDFLARE_DOMAINS', '*')),
                 'headers' => ['CF-Connecting-IPv6', 'CF-Connecting-IP'],
                 'proxies' => array_values(array_unique(array_merge([
                     '103.21.244.0/22',

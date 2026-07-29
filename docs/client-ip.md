@@ -73,6 +73,10 @@ FOUNDATION_ALIBABA_CDN_DOMAINS=static.example.com,*.ali.example.com
 Cloudflare、阿里 CDN 和自定义 WAF 默认全部关闭。必须显式设置对应的
 `FOUNDATION_*_ENABLED=true` 才会参与客户端 IP 解析。
 
+Cloudflare 的域名默认值为 `*`，因此只设置
+`FOUNDATION_CLOUDFLARE_ENABLED=true` 时，会匹配所有从 Cloudflare 官方节点回源的
+域名。阿里 CDN 和自定义 WAF 的域名默认仍为空，必须明确配置。
+
 ## 默认节点
 
 Cloudflare 已内置官方 IPv4 和 IPv6 回源网段，支持通过环境变量追加：
