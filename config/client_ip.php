@@ -14,7 +14,7 @@ return [
 
     /*
      * 节点按顺序匹配。只有 Host 命中节点 domains 且 REMOTE_ADDR 命中 proxies 时，
-     * 才会信任对应请求头。可在发布后的配置中追加自建代理节点。
+     * 才会信任对应请求头。可在 foundation_custom.php 中追加自建代理节点。
      * domains 留空表示该节点不参与匹配；明确配置 ['*'] 才表示允许所有域名。
      */
     'nodes' => [

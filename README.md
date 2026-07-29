@@ -50,8 +50,12 @@ composer dump-autoload
 php artisan optimize:clear
 ```
 
-配置文件由 Service Provider 合并；需要修改时发布对应配置，而不是在业务代码中直接
-读取环境变量。
+核心配置由 Service Provider 自动加载，不发布到宿主项目。项目只发布并维护
+`config/foundation_custom.php` 差异配置，包升级后未覆盖的默认值会自动更新：
+
+```bash
+php artisan vendor:publish --tag=foundation-custom-config
+```
 
 Foundation 的 Telegram 异常和普通消息通知默认投递到 Laravel Queue。生产环境需要
 使用非 `sync` 队列连接，并运行 `foundation-notifications` 队列 Worker；详细配置见

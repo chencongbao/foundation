@@ -4,8 +4,9 @@ TRON RPC 实现在 `src/Services/Tron/TronRpcClient.php`，异常位于
 `src/Exceptions/TronRpcException.php`，Laravel 静态入口位于
 `src/Facades/TronRpc.php`。
 
-配置文件是 `config/tron_rpc.php`，支持多个 Endpoint、App ID、HMAC Secret、连接超时
-和请求超时。
+包内核心配置是 `config/tron_rpc.php`，支持多个 Endpoint、App ID、HMAC Secret、
+连接超时和请求超时。通常直接通过 `.env` 配置；需要覆盖配置结构时，写入宿主项目
+`config/foundation_custom.php` 的 `tron_rpc` 顶级键，不发布核心配置文件。
 
 推荐通过构造函数注入：
 

@@ -16,7 +16,7 @@ return [
     ],
 
     /*
-     * 发布配置后可继续添加任意模块。模块配置只覆盖 default 中的同名字段。
+     * 可在 foundation_custom.php 中添加任意模块。模块配置只覆盖 default 中的同名字段。
      */
     'modules' => [
         'tron_rpc' => [

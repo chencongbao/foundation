@@ -1,38 +1,30 @@
 # 模块日志与异常通知
 
-配置文件为 `config/foundation_log.php`，支持针对每个功能模块设置日志开关、最低级别、
-Laravel 日志 Channel 和异常通知开关。
+核心默认配置为包内的 `config/foundation_log.php`，支持针对每个功能模块设置日志开关、
+最低级别、Laravel 日志 Channel 和异常通知开关。项目差异统一写入
+`config/foundation_custom.php`。
 
-发布配置：
+发布项目差异配置：
 
 ```bash
-php artisan vendor:publish --tag=foundation-log-config
+php artisan vendor:publish --tag=foundation-custom-config
 ```
 
 ## 模块配置
 
 ```php
-'default' => [
-    'enabled' => true,
-    'channel' => 'stack',
-    'level' => 'debug',
-    'notify' => false,
-],
-
-'modules' => [
-    'tron_rpc' => [
-        'enabled' => true,
-        'channel' => 'daily',
-        'level' => 'info',
-        'notify' => true,
+return [
+    'foundation_log' => [
+        'modules' => [
+            'payment' => [
+                'enabled' => true,
+                'path' => storage_path('logs/{date}/foundation/payment.log'),
+                'level' => 'warning',
+                'notify' => false,
+            ],
+        ],
     ],
-    'payment' => [
-        'enabled' => true,
-        'channel' => 'daily',
-        'level' => 'warning',
-        'notify' => false,
-    ],
-],
+];
 ```
 
 模块配置了 `path` 时使用独立日志文件；未配置 `path` 时，`channel` 必须在宿主项目

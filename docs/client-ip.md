@@ -131,10 +131,11 @@ FOUNDATION_WAF_PROXIES=203.0.113.10,203.0.113.0/24
 发布独立配置文件：
 
 ```bash
-php artisan vendor:publish --tag=foundation-client-ip-config
+php artisan vendor:publish --tag=foundation-custom-config
 ```
 
-发布后配置位于宿主项目的 `config/client_ip.php`。
+项目自定义配置位于宿主项目的 `config/foundation_custom.php`，写在 `client_ip` 顶级键
+下。包内的 `config/client_ip.php` 是核心默认配置，不再发布。
 
 完整判断顺序：
 

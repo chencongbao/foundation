@@ -10,6 +10,7 @@ use Chencongbao\Foundation\Services\Tron\TronRpcClient;
 use Chencongbao\Foundation\Contracts\ClientIpResolver;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
 use Chencongbao\Foundation\Contracts\MessageNotifier;
+use Chencongbao\Foundation\Support\ConfigMerger;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
 use Chencongbao\Foundation\Services\Notification\TelegramExceptionNotifier;
@@ -29,6 +30,8 @@ class FoundationServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/client_ip.php', 'client_ip');
         $this->mergeConfigFrom(__DIR__.'/../config/foundation_log.php', 'foundation_log');
         $this->mergeConfigFrom(__DIR__.'/../config/tron_rpc.php', 'tron_rpc');
+        $this->mergeConfigFrom(__DIR__.'/../config/foundation_custom.php', 'foundation_custom');
+        $this->applyProjectConfigOverrides();
 
         $this->app->singleton(ClientIpResolver::class, static fn ($app): ClientIpResolver => new TrustedProxyClientIpResolver(
             (array) $app['config']->get('client_ip', []),
@@ -73,9 +76,26 @@ class FoundationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->publishes([__DIR__.'/../config/foundation.php' => config_path('foundation.php')], 'foundation-config');
-        $this->publishes([__DIR__.'/../config/client_ip.php' => config_path('client_ip.php')], 'foundation-client-ip-config');
-        $this->publishes([__DIR__.'/../config/foundation_log.php' => config_path('foundation_log.php')], 'foundation-log-config');
-        $this->publishes([__DIR__.'/../config/tron_rpc.php' => config_path('tron_rpc.php')], 'foundation-tron-rpc-config');
+        $this->publishes([
+            __DIR__.'/../config/foundation_custom.php' => config_path('foundation_custom.php'),
+        ], 'foundation-custom-config');
+    }
+
+    private function applyProjectConfigOverrides(): void
+    {
+        $config = $this->app['config'];
+        $custom = (array) $config->get('foundation_custom', []);
+
+        foreach (['foundation', 'client_ip', 'foundation_log', 'tron_rpc'] as $key) {
+            $overrides = $custom[$key] ?? null;
+            if (!is_array($overrides) || $overrides === []) {
+                continue;
+            }
+
+            $config->set(
+                $key,
+                ConfigMerger::replaceRecursive((array) $config->get($key, []), $overrides)
+            );
+        }
     }
 }
