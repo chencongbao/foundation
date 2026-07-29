@@ -142,7 +142,6 @@ FOUNDATION_TELEGRAM_MESSAGE_THREAD_ID=
 FOUNDATION_TELEGRAM_TIMEOUT=3
 
 FOUNDATION_TELEGRAM_QUEUE_ENABLED=true
-FOUNDATION_TELEGRAM_QUEUE_CONNECTION=redis
 FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
 FOUNDATION_TELEGRAM_QUEUE_TRIES=3
 FOUNDATION_TELEGRAM_QUEUE_TIMEOUT=30
@@ -168,12 +167,19 @@ Telegram 通知默认通过 Laravel Queue 异步投递。业务请求只负责�
 
 ```dotenv
 QUEUE_CONNECTION=redis
-FOUNDATION_TELEGRAM_QUEUE_CONNECTION=redis
 FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
 ```
 
 ```bash
-php artisan queue:work redis --queue=foundation-notifications
+php artisan queue:work --queue=foundation-notifications
+```
+
+Foundation 默认跟随宿主项目 `config/queue.php` 的 `default` 连接，也就是通常由
+`QUEUE_CONNECTION` 决定，不需要设置 `FOUNDATION_TELEGRAM_QUEUE_CONNECTION`。
+只有通知任务必须使用与项目默认队列不同的连接时，才进行单独覆盖：
+
+```dotenv
+FOUNDATION_TELEGRAM_QUEUE_CONNECTION=redis
 ```
 
 如果使用 Supervisor，请让 Supervisor 持续运行以上 Worker。发布新代码或修改包代码

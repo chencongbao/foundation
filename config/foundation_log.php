@@ -46,6 +46,7 @@ return [
         'application' => (string) env('APP_NAME', 'Laravel'),
         'queue' => [
             'enabled' => (bool) env('FOUNDATION_TELEGRAM_QUEUE_ENABLED', true),
+            // 留空时跟随宿主项目 queue.default（即 QUEUE_CONNECTION）。
             'connection' => env('FOUNDATION_TELEGRAM_QUEUE_CONNECTION'),
             'name' => (string) env('FOUNDATION_TELEGRAM_QUEUE', 'foundation-notifications'),
             'tries' => max(1, (int) env('FOUNDATION_TELEGRAM_QUEUE_TRIES', 3)),
