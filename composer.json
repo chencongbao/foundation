@@ -6,9 +6,11 @@
     "require": {
         "php": "^8.0.2",
         "guzzlehttp/guzzle": "^7.2",
-        "illuminate/http": "^9.19",
-        "illuminate/log": "^9.19",
-        "illuminate/support": "^9.19"
+        "illuminate/bus": "^9.19 || ^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "illuminate/http": "^9.19 || ^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "illuminate/log": "^9.19 || ^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "illuminate/queue": "^9.19 || ^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "illuminate/support": "^9.19 || ^10.0 || ^11.0 || ^12.0 || ^13.0"
     },
     "autoload": {
         "psr-4": {
@@ -28,8 +30,8 @@
     },
     "require-dev": {
         "mockery/mockery": "^1.4",
-        "orchestra/testbench": "^7.0",
-        "phpunit/phpunit": "^9.5"
+        "orchestra/testbench": "^7.0 || ^8.0 || ^9.0 || ^10.0 || ^11.0",
+        "phpunit/phpunit": "^9.5 || ^10.0 || ^11.0 || ^12.0"
     },
     "extra": {
         "laravel": {

@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
+use Chencongbao\Foundation\Contracts\MessageNotifier;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 
 class FoundationLoggerTest extends TestCase
@@ -113,6 +114,68 @@ class FoundationLoggerTest extends TestCase
         $logger->exception('tron_rpc', new RuntimeException('failed'), [
             'request_id' => 'rpc-1',
         ]);
+    }
+
+    public function test_normal_message_can_write_a_log_and_send_a_notification(): void
+    {
+        $channel = Mockery::mock(LoggerInterface::class);
+        $channel->shouldReceive('log')
+            ->once()
+            ->with('warning', '[payment] payment delayed', [
+                'order_no' => 'P100',
+                'token' => '[REDACTED]',
+            ]);
+
+        $logs = Mockery::mock(LogManager::class);
+        $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
+
+        $exceptionNotifier = Mockery::mock(ExceptionNotifier::class);
+        $exceptionNotifier->shouldNotReceive('notify');
+        $messageNotifier = Mockery::mock(MessageNotifier::class);
+        $messageNotifier->shouldReceive('notifyMessage')
+            ->once()
+            ->with('payment', 'payment delayed', [
+                'order_no' => 'P100',
+                'token' => '[REDACTED]',
+            ])
+            ->andReturn(true);
+
+        $config = $this->config();
+        $config['modules']['payment'] = [
+            'enabled' => true,
+            'channel' => 'daily',
+            'level' => 'debug',
+            'notify' => true,
+        ];
+
+        $logger = new FoundationLogger($logs, $exceptionNotifier, $config, $messageNotifier);
+        $logger->message('payment', 'payment delayed', [
+            'order_no' => 'P100',
+            'token' => 'secret-token',
+        ], 'warning');
+    }
+
+    public function test_normal_message_notification_is_independent_from_the_file_log_switch(): void
+    {
+        $logs = Mockery::mock(LogManager::class);
+        $logs->shouldNotReceive('channel');
+        $logs->shouldNotReceive('build');
+
+        $exceptionNotifier = Mockery::mock(ExceptionNotifier::class);
+        $messageNotifier = Mockery::mock(MessageNotifier::class);
+        $messageNotifier->shouldReceive('notifyMessage')
+            ->once()
+            ->with('payment', 'manual alert', ['order_no' => 'P101'])
+            ->andReturn(true);
+
+        $config = $this->config();
+        $config['modules']['payment'] = [
+            'enabled' => false,
+            'notify' => true,
+        ];
+
+        $logger = new FoundationLogger($logs, $exceptionNotifier, $config, $messageNotifier);
+        $logger->message('payment', 'manual alert', ['order_no' => 'P101']);
     }
 
     public function test_it_resolves_the_date_placeholder_to_a_daily_directory(): void

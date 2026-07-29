@@ -5,6 +5,10 @@ Laravel 项目共享基础包。这里只收录跨项目可复用、接口稳定
 
 各模块的用途、边界和示例见 [Foundation 文档索引](docs/README.md)。
 
+支持 Laravel 9.19+、10、11、12 和 13。包本身保持 PHP 8.0.2 语法兼容；
+安装 Laravel 10 或更高版本时，PHP 版本还需要满足对应 Laravel 版本的要求。新的
+Laravel 主版本发布后，应在兼容测试通过后再追加版本约束，避免未经验证地自动安装。
+
 ## 目录约定
 
 项目已建立以下标准目录；暂时没有实现的目录使用 `.gitkeep` 保留：
@@ -18,6 +22,7 @@ src/
 ├── Facades/         Laravel Facade
 ├── Functions/       少量高频全局函数
 ├── Http/            通用中间件、Request
+├── Jobs/            可跨项目复用的 Laravel 队列任务
 ├── Providers/       拆分后的服务注册器
 ├── Rules/           通用验证规则
 ├── Services/        外部服务或依赖 Laravel 的功能
@@ -47,6 +52,10 @@ php artisan optimize:clear
 
 配置文件由 Service Provider 合并；需要修改时发布对应配置，而不是在业务代码中直接
 读取环境变量。
+
+Foundation 的 Telegram 异常和普通消息通知默认投递到 Laravel Queue。生产环境需要
+使用非 `sync` 队列连接，并运行 `foundation-notifications` 队列 Worker；详细配置见
+[模块日志与异常通知](docs/logging.md)。
 
 ## TRON 内网 RPC
 

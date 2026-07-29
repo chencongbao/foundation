@@ -19,6 +19,7 @@
 - [Facades 门面](facades.md)
 - [Functions 全局函数](functions.md)
 - [HTTP 层](http.md)
+- [Jobs 队列任务](jobs.md)
 - [客户端 IP 解析](client-ip.md)
 - [模块日志与异常通知](logging.md)
 - [Rules 验证规则](rules.md)

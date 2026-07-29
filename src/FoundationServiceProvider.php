@@ -4,13 +4,16 @@ namespace Chencongbao\Foundation;
 
 use GuzzleHttp\Client;
 use Illuminate\Log\LogManager;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\ServiceProvider;
 use Chencongbao\Foundation\Services\Tron\TronRpcClient;
 use Chencongbao\Foundation\Contracts\ClientIpResolver;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
+use Chencongbao\Foundation\Contracts\MessageNotifier;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
 use Chencongbao\Foundation\Services\Notification\TelegramExceptionNotifier;
+use Chencongbao\Foundation\Services\Notification\TelegramNotificationSender;
 
 /**
  * 注册 foundation 包提供的共享基础服务。
@@ -32,15 +35,29 @@ class FoundationServiceProvider extends ServiceProvider
             $app->make(FoundationLogger::class)
         ));
 
-        $this->app->singleton(ExceptionNotifier::class, static fn ($app): ExceptionNotifier => new TelegramExceptionNotifier(
+        $this->app->singleton(TelegramNotificationSender::class, static fn ($app): TelegramNotificationSender => new TelegramNotificationSender(
             new Client(),
             (array) $app['config']->get('foundation_log.telegram', [])
         ));
+        $this->app->singleton(TelegramExceptionNotifier::class, static fn ($app): TelegramExceptionNotifier => new TelegramExceptionNotifier(
+            $app->make(TelegramNotificationSender::class),
+            $app->make(Dispatcher::class),
+            (array) $app['config']->get('foundation_log.telegram', [])
+        ));
+        $this->app->singleton(
+            ExceptionNotifier::class,
+            static fn ($app): ExceptionNotifier => $app->make(TelegramExceptionNotifier::class)
+        );
+        $this->app->singleton(
+            MessageNotifier::class,
+            static fn ($app): MessageNotifier => $app->make(TelegramExceptionNotifier::class)
+        );
 
         $this->app->singleton(FoundationLogger::class, static fn ($app): FoundationLogger => new FoundationLogger(
             $app->make(LogManager::class),
             $app->make(ExceptionNotifier::class),
-            (array) $app['config']->get('foundation_log', [])
+            (array) $app['config']->get('foundation_log', []),
+            $app->make(MessageNotifier::class)
         ));
 
         $this->app->singleton(TronRpcClient::class, static fn ($app): TronRpcClient => new TronRpcClient(

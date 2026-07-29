@@ -97,6 +97,33 @@ FoundationLog::warning('payment', '付款匹配到多笔', $context);
 FoundationLog::error('tron_rpc', 'RPC 请求失败', $context);
 ```
 
+## 普通消息：本地日志和 Telegram 通知
+
+`message()` 用于业务告警、任务完成提示等非异常消息。一次调用会分别检查模块的
+`enabled` 和 `notify` 开关：
+
+```php
+use Chencongbao\Foundation\Facades\FoundationLog;
+
+FoundationLog::message('payment', '付款处理时间超过预期', [
+    'order_no' => $orderNo,
+    'elapsed_ms' => $elapsedMs,
+], 'warning');
+```
+
+- `enabled=true` 时，消息会按传入级别写入模块日志；
+- `notify=true` 时，消息会发送到 Telegram；
+- 第四个参数是日志级别，默认是 `info`；
+- 普通消息通知不会生成虚假的异常类、异常代码或调用栈。
+
+也可以通过依赖注入调用：
+
+```php
+$this->logger->message('payment', '日终对账完成', [
+    'total' => $total,
+]);
+```
+
 ## 记录并通知异常
 
 ```php
@@ -121,6 +148,13 @@ FOUNDATION_TELEGRAM_BOT_TOKEN=123456:bot-token
 FOUNDATION_TELEGRAM_CHAT_IDS=-1001234567890,-1009876543210
 FOUNDATION_TELEGRAM_MESSAGE_THREAD_ID=
 FOUNDATION_TELEGRAM_TIMEOUT=3
+
+FOUNDATION_TELEGRAM_QUEUE_ENABLED=true
+FOUNDATION_TELEGRAM_QUEUE_CONNECTION=redis
+FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
+FOUNDATION_TELEGRAM_QUEUE_TRIES=3
+FOUNDATION_TELEGRAM_QUEUE_TIMEOUT=30
+FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 ```
 
 真正发送必须同时满足：
@@ -133,9 +167,45 @@ FOUNDATION_TELEGRAM_TIMEOUT=3
 任何一项不满足都不会发送。Telegram 请求失败只返回失败状态，不抛出异常，不影响原
 业务。
 
+## Telegram 异步队列
+
+Telegram 通知默认通过 Laravel Queue 异步投递。业务请求只负责写本地日志和提交
+`SendTelegramNotification` Job，不会等待 Telegram HTTP 请求完成。
+
+要实现真正异步，宿主项目的队列连接不能是 `sync`，并且必须启动对应队列 Worker：
+
+```dotenv
+QUEUE_CONNECTION=redis
+FOUNDATION_TELEGRAM_QUEUE_CONNECTION=redis
+FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
+```
+
+```bash
+php artisan queue:work redis --queue=foundation-notifications
+```
+
+如果使用 Supervisor，请让 Supervisor 持续运行以上 Worker。发布新代码或修改包代码
+后执行：
+
+```bash
+php artisan queue:restart
+```
+
+发送失败时 Job 会抛出异常，由 Laravel Queue 按 `TRIES` 和 `BACKOFF` 配置重试。
+Job 只序列化通知文本，不会把 Telegram Bot Token 和 Chat ID 写入队列 Payload。
+
+如需本地调试时恢复同步发送：
+
+```dotenv
+FOUNDATION_TELEGRAM_QUEUE_ENABLED=false
+```
+
+注意：仅设置 `FOUNDATION_TELEGRAM_QUEUE_ENABLED=true` 但项目
+`QUEUE_CONNECTION=sync` 时，Laravel 仍会在当前进程立即执行 Job，不属于真正异步。
+
 日志和通知开关相互独立：模块 `enabled` 只控制文件日志，模块 `notify` 只控制异常
-通知。TRON RPC 的 `notify` 和 Telegram 全局 `enabled` 默认开启；未配置 Bot Token
-或 Chat ID 时仍不会发出请求。
+或普通消息通知。TRON RPC 的 `notify` 和 Telegram 全局 `enabled` 默认开启；未配置
+Bot Token 或 Chat ID 时仍不会发出请求。
 
 ## 敏感字段
 

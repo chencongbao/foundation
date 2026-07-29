@@ -8,6 +8,7 @@ use Illuminate\Log\LogManager;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
+use Chencongbao\Foundation\Contracts\MessageNotifier;
 
 final class FoundationLogger
 {
@@ -24,14 +25,21 @@ final class FoundationLogger
 
     private LogManager $logs;
     private ExceptionNotifier $notifier;
+    private ?MessageNotifier $messageNotifier;
     private array $config;
     /** @var array<string, LoggerInterface> */
     private array $moduleLoggers = [];
 
-    public function __construct(LogManager $logs, ExceptionNotifier $notifier, array $config)
+    public function __construct(
+        LogManager $logs,
+        ExceptionNotifier $notifier,
+        array $config,
+        ?MessageNotifier $messageNotifier = null
+    )
     {
         $this->logs = $logs;
         $this->notifier = $notifier;
+        $this->messageNotifier = $messageNotifier;
         $this->config = $config;
     }
 
@@ -66,6 +74,30 @@ final class FoundationLogger
         $cacheKey = $this->loggerCacheKey($module, $settings);
         $logger = $this->moduleLoggers[$cacheKey] ??= $this->moduleLogger($settings);
         $logger->log($level, '['.$module.'] '.$message, $this->sanitize($context));
+    }
+
+    public function message(
+        string $module,
+        string $message,
+        array $context = [],
+        string $level = LogLevel::INFO
+    ): void {
+        $module = $this->moduleName($module);
+        $settings = $this->moduleSettings($module);
+        $loggingEnabled = ($settings['enabled'] ?? false) === true;
+        $notificationEnabled = ($settings['notify'] ?? false) === true;
+        if (!$loggingEnabled && !$notificationEnabled) {
+            return;
+        }
+
+        $safeContext = $this->sanitize($context);
+        if ($loggingEnabled) {
+            $this->log($module, $level, $message, $safeContext);
+        }
+
+        if ($notificationEnabled && $this->messageNotifier !== null) {
+            $this->messageNotifier->notifyMessage($module, $message, $safeContext);
+        }
     }
 
     private function moduleLogger(array $settings): LoggerInterface

@@ -44,6 +44,14 @@ return [
         'timeout_seconds' => max(0.5, (float) env('FOUNDATION_TELEGRAM_TIMEOUT', 3)),
         'environment' => (string) env('APP_ENV', 'production'),
         'application' => (string) env('APP_NAME', 'Laravel'),
+        'queue' => [
+            'enabled' => (bool) env('FOUNDATION_TELEGRAM_QUEUE_ENABLED', true),
+            'connection' => env('FOUNDATION_TELEGRAM_QUEUE_CONNECTION'),
+            'name' => (string) env('FOUNDATION_TELEGRAM_QUEUE', 'foundation-notifications'),
+            'tries' => max(1, (int) env('FOUNDATION_TELEGRAM_QUEUE_TRIES', 3)),
+            'timeout_seconds' => max(1, (int) env('FOUNDATION_TELEGRAM_QUEUE_TIMEOUT', 30)),
+            'backoff_seconds' => max(0, (int) env('FOUNDATION_TELEGRAM_QUEUE_BACKOFF', 5)),
+        ],
     ],
 
     'sensitive_keys' => [
