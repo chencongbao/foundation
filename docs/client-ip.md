@@ -54,7 +54,10 @@ $result->toArray();
 Cloudflare 和阿里 CDN 分别配置自己的域名：
 
 ```dotenv
+FOUNDATION_CLOUDFLARE_ENABLED=true
 FOUNDATION_CLOUDFLARE_DOMAINS=api.example.com,*.cf.example.com
+
+FOUNDATION_ALIBABA_CDN_ENABLED=true
 FOUNDATION_ALIBABA_CDN_DOMAINS=static.example.com,*.ali.example.com
 ```
 
@@ -66,6 +69,9 @@ FOUNDATION_ALIBABA_CDN_DOMAINS=static.example.com,*.ali.example.com
 
 支持精确域名和 `*.example.com` 通配域名。节点的 `domains` 留空表示不启用该节点；
 如果确实需要匹配所有域名，必须明确配置 `['*']`。
+
+Cloudflare、阿里 CDN 和自定义 WAF 默认全部关闭。必须显式设置对应的
+`FOUNDATION_*_ENABLED=true` 才会参与客户端 IP 解析。
 
 ## 默认节点
 

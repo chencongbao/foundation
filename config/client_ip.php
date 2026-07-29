@@ -21,7 +21,7 @@ return [
             'cloudflare' => [
                 'name' => 'Cloudflare',
                 'type' => 'cloudflare',
-                'enabled' => true,
+                'enabled' => (bool) env('FOUNDATION_CLOUDFLARE_ENABLED', false),
                 'domains' => ConfigList::fromCommaSeparated((string) env('FOUNDATION_CLOUDFLARE_DOMAINS', '')),
                 'headers' => ['CF-Connecting-IPv6', 'CF-Connecting-IP'],
                 'proxies' => array_values(array_unique(array_merge([
@@ -53,7 +53,7 @@ return [
             'alibaba_cdn' => [
                 'name' => 'Alibaba Cloud CDN',
                 'type' => 'alibaba_cdn',
-                'enabled' => true,
+                'enabled' => (bool) env('FOUNDATION_ALIBABA_CDN_ENABLED', false),
                 'domains' => ConfigList::fromCommaSeparated((string) env('FOUNDATION_ALIBABA_CDN_DOMAINS', '')),
                 'headers' => ['Ali-Cdn-Real-Ip', 'X-Forwarded-For'],
                 // 阿里 CDN 回源 IP 动态分配，需按控制台/API 结果补充可信网段。
