@@ -18,7 +18,6 @@
 |             'enabled' => true,
 |             'path' => storage_path('logs/{date}/foundation/payment.log'),
 |             'level' => 'info',
-|             'notify' => true,
 |         ],
 |     ],
 | ],

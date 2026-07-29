@@ -41,7 +41,6 @@ class TelegramExceptionNotifierTest extends TestCase
             'enabled' => true,
             'bot_token' => '123456:test-token',
             'chat_ids' => ['-1001', '-1002'],
-            'message_thread_id' => 88,
             'timeout_seconds' => 3,
             'application' => 'Robots',
             'environment' => 'production',
@@ -55,32 +54,7 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertCount(2, $requests);
         $this->assertStringContainsString('/bot123456:test-token/sendMessage', $requests[0]['uri']);
         $this->assertSame('-1001', $requests[0]['params']['chat_id']);
-        $this->assertSame('88', $requests[0]['params']['message_thread_id']);
         $this->assertStringContainsString('Module: tron_rpc', $requests[0]['params']['text']);
-    }
-
-    public function test_it_sends_a_normal_message_without_an_exception_payload(): void
-    {
-        $requests = [];
-        $config = [
-            'enabled' => true,
-            'bot_token' => '123456:test-token',
-            'chat_ids' => ['-1001'],
-            'timeout_seconds' => 3,
-            'application' => 'Robots',
-            'environment' => 'production',
-            'queue' => ['enabled' => false],
-        ];
-        $notifier = $this->notifier($requests, $config);
-
-        $this->assertTrue($notifier->notifyMessage('payment', 'payment delayed', [
-            'order_no' => 'P100',
-        ]));
-        $this->assertCount(1, $requests);
-        $this->assertStringContainsString('Foundation message', $requests[0]['params']['text']);
-        $this->assertStringContainsString('Module: payment', $requests[0]['params']['text']);
-        $this->assertStringContainsString('Message: payment delayed', $requests[0]['params']['text']);
-        $this->assertStringNotContainsString('Exception:', $requests[0]['params']['text']);
     }
 
     public function test_it_dispatches_telegram_notifications_to_the_configured_queue(): void
@@ -117,7 +91,35 @@ class TelegramExceptionNotifierTest extends TestCase
             ->andReturn('job-id');
         $notifier = new TelegramExceptionNotifier($sender, $dispatcher, $config);
 
-        $this->assertTrue($notifier->notifyMessage('payment', 'queued message'));
+        $this->assertTrue($notifier->notify('payment', new RuntimeException('queued exception')));
+        $this->assertSame([], $requests);
+    }
+
+    public function test_it_uses_the_laravel_default_queue_when_no_queue_name_is_configured(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'queue' => [
+                'enabled' => true,
+            ],
+        ];
+        $sender = new TelegramNotificationSender($this->client($requests), $config);
+        $dispatcher = Mockery::mock(Dispatcher::class);
+        $dispatcher->shouldReceive('dispatch')
+            ->once()
+            ->with(Mockery::on(static function ($job): bool {
+                return $job instanceof SendTelegramNotification
+                    && $job->connection === null
+                    && $job->queue === null;
+            }))
+            ->andReturn('job-id');
+        $notifier = new TelegramExceptionNotifier($sender, $dispatcher, $config);
+
+        $this->assertTrue($notifier->notify('tron_rpc', new RuntimeException('queued exception')));
         $this->assertSame([], $requests);
     }
 

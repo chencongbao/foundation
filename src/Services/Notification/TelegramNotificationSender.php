@@ -37,10 +37,6 @@ final class TelegramNotificationSender
                     'text' => $message,
                     'disable_web_page_preview' => true,
                 ];
-                $threadId = $this->config['message_thread_id'] ?? null;
-                if ($threadId !== null && $threadId !== '') {
-                    $params['message_thread_id'] = (int) $threadId;
-                }
 
                 $response = $this->httpClient->request('POST', $this->endpoint(), [
                     'connect_timeout' => min(1.0, (float) $this->config['timeout_seconds']),

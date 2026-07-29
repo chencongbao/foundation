@@ -57,8 +57,9 @@ php artisan optimize:clear
 php artisan vendor:publish --tag=foundation-custom-config
 ```
 
-Foundation 的 Telegram 异常和普通消息通知默认投递到 Laravel Queue。生产环境需要
-使用非 `sync` 队列连接，并运行 `foundation-notifications` 队列 Worker；详细配置见
+Foundation 的 Telegram 异常通知默认投递到 Laravel Queue。生产环境需要
+使用非 `sync` 队列连接并运行 Queue Worker；未配置专用队列名时使用 Laravel 的
+`default` 队列。详细配置见
 [模块日志与异常通知](docs/logging.md)。
 
 ## TRON 内网 RPC

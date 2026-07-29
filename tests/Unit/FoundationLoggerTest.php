@@ -10,14 +10,13 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
-use Chencongbao\Foundation\Contracts\MessageNotifier;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 
 class FoundationLoggerTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
-    public function test_it_logs_by_module_and_notifies_enabled_exceptions_with_sanitized_context(): void
+    public function test_it_logs_by_module_and_notifies_exceptions_with_sanitized_context(): void
     {
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
@@ -108,7 +107,6 @@ class FoundationLoggerTest extends TestCase
 
         $config = $this->config();
         $config['modules']['tron_rpc']['enabled'] = false;
-        $config['modules']['tron_rpc']['notify'] = true;
 
         $logger = new FoundationLogger($logs, $notifier, $config);
         $logger->exception('tron_rpc', new RuntimeException('failed'), [
@@ -116,7 +114,25 @@ class FoundationLoggerTest extends TestCase
         ]);
     }
 
-    public function test_normal_message_can_write_a_log_and_send_a_notification(): void
+    public function test_client_ip_exceptions_also_use_the_global_notifier(): void
+    {
+        $logs = Mockery::mock(LogManager::class);
+        $logs->shouldNotReceive('channel');
+        $logs->shouldNotReceive('build');
+
+        $notifier = Mockery::mock(ExceptionNotifier::class);
+        $notifier->shouldReceive('notify')
+            ->once()
+            ->with('client_ip', Mockery::type(RuntimeException::class), ['host' => 'api.example.com'])
+            ->andReturn(true);
+
+        $logger = new FoundationLogger($logs, $notifier, $this->config());
+        $logger->exception('client_ip', new RuntimeException('resolve failed'), [
+            'host' => 'api.example.com',
+        ]);
+    }
+
+    public function test_normal_message_only_writes_a_local_log(): void
     {
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
@@ -131,50 +147,36 @@ class FoundationLoggerTest extends TestCase
 
         $exceptionNotifier = Mockery::mock(ExceptionNotifier::class);
         $exceptionNotifier->shouldNotReceive('notify');
-        $messageNotifier = Mockery::mock(MessageNotifier::class);
-        $messageNotifier->shouldReceive('notifyMessage')
-            ->once()
-            ->with('payment', 'payment delayed', [
-                'order_no' => 'P100',
-                'token' => '[REDACTED]',
-            ])
-            ->andReturn(true);
 
         $config = $this->config();
         $config['modules']['payment'] = [
             'enabled' => true,
             'channel' => 'daily',
             'level' => 'debug',
-            'notify' => true,
         ];
 
-        $logger = new FoundationLogger($logs, $exceptionNotifier, $config, $messageNotifier);
+        $logger = new FoundationLogger($logs, $exceptionNotifier, $config);
         $logger->message('payment', 'payment delayed', [
             'order_no' => 'P100',
             'token' => 'secret-token',
         ], 'warning');
     }
 
-    public function test_normal_message_notification_is_independent_from_the_file_log_switch(): void
+    public function test_normal_message_does_nothing_when_the_module_log_is_disabled(): void
     {
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldNotReceive('channel');
         $logs->shouldNotReceive('build');
 
         $exceptionNotifier = Mockery::mock(ExceptionNotifier::class);
-        $messageNotifier = Mockery::mock(MessageNotifier::class);
-        $messageNotifier->shouldReceive('notifyMessage')
-            ->once()
-            ->with('payment', 'manual alert', ['order_no' => 'P101'])
-            ->andReturn(true);
+        $exceptionNotifier->shouldNotReceive('notify');
 
         $config = $this->config();
         $config['modules']['payment'] = [
             'enabled' => false,
-            'notify' => true,
         ];
 
-        $logger = new FoundationLogger($logs, $exceptionNotifier, $config, $messageNotifier);
+        $logger = new FoundationLogger($logs, $exceptionNotifier, $config);
         $logger->message('payment', 'manual alert', ['order_no' => 'P101']);
     }
 
@@ -200,7 +202,6 @@ class FoundationLoggerTest extends TestCase
             'driver' => 'single',
             'path' => '/tmp/logs/{date}/foundation/client_ip.log',
             'level' => 'info',
-            'notify' => false,
         ];
 
         $logger = new FoundationLogger($logs, $notifier, $config);
@@ -214,13 +215,11 @@ class FoundationLoggerTest extends TestCase
                 'enabled' => true,
                 'channel' => 'stack',
                 'level' => 'debug',
-                'notify' => false,
             ],
             'modules' => [
                 'tron_rpc' => [
                     'channel' => 'daily',
                     'level' => 'info',
-                    'notify' => true,
                 ],
                 'client_ip' => [
                     'enabled' => false,

@@ -14,7 +14,6 @@
 当前通知接口：
 
 - `ExceptionNotifier`：发送异常通知；
-- `MessageNotifier`：发送不带异常信息的普通消息通知。
 
-默认 Telegram 实现同时实现以上两个接口。业务代码通常使用 `FoundationLogger` 或
-`FoundationLog`，只有替换通知渠道或单独测试通知发送时才直接依赖这些接口。
+默认实现通过 Telegram 异步发送异常。业务代码通常使用 `FoundationLogger` 或
+`FoundationLog`，只有替换异常通知渠道或单独测试通知发送时才直接依赖该接口。

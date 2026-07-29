@@ -8,7 +8,6 @@ use Illuminate\Log\LogManager;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
-use Chencongbao\Foundation\Contracts\MessageNotifier;
 
 final class FoundationLogger
 {
@@ -25,7 +24,6 @@ final class FoundationLogger
 
     private LogManager $logs;
     private ExceptionNotifier $notifier;
-    private ?MessageNotifier $messageNotifier;
     private array $config;
     /** @var array<string, LoggerInterface> */
     private array $moduleLoggers = [];
@@ -33,13 +31,11 @@ final class FoundationLogger
     public function __construct(
         LogManager $logs,
         ExceptionNotifier $notifier,
-        array $config,
-        ?MessageNotifier $messageNotifier = null
+        array $config
     )
     {
         $this->logs = $logs;
         $this->notifier = $notifier;
-        $this->messageNotifier = $messageNotifier;
         $this->config = $config;
     }
 
@@ -82,22 +78,7 @@ final class FoundationLogger
         array $context = [],
         string $level = LogLevel::INFO
     ): void {
-        $module = $this->moduleName($module);
-        $settings = $this->moduleSettings($module);
-        $loggingEnabled = ($settings['enabled'] ?? false) === true;
-        $notificationEnabled = ($settings['notify'] ?? false) === true;
-        if (!$loggingEnabled && !$notificationEnabled) {
-            return;
-        }
-
-        $safeContext = $this->sanitize($context);
-        if ($loggingEnabled) {
-            $this->log($module, $level, $message, $safeContext);
-        }
-
-        if ($notificationEnabled && $this->messageNotifier !== null) {
-            $this->messageNotifier->notifyMessage($module, $message, $safeContext);
-        }
+        $this->log($module, $level, $message, $context);
     }
 
     private function moduleLogger(array $settings): LoggerInterface
@@ -128,10 +109,6 @@ final class FoundationLogger
         $module = $this->moduleName($module);
         $settings = $this->moduleSettings($module);
         $loggingEnabled = ($settings['enabled'] ?? false) === true;
-        $notificationEnabled = ($settings['notify'] ?? false) === true;
-        if (!$loggingEnabled && !$notificationEnabled) {
-            return;
-        }
 
         $safeContext = $this->sanitize($context);
         if ($loggingEnabled) {
@@ -143,9 +120,7 @@ final class FoundationLogger
             ]);
         }
 
-        if ($notificationEnabled) {
-            $this->notifier->notify($module, $exception, $safeContext);
-        }
+        $this->notifier->notify($module, $exception, $safeContext);
     }
 
     private function moduleSettings(string $module): array

@@ -8,8 +8,8 @@ Payload。
 
 `SendTelegramNotification` 负责在 Queue Worker 中调用 Telegram：
 
-- 异常通知和普通消息通知共用该 Job；
-- 默认投递到 `foundation-notifications` 队列；
+- 只处理 `FoundationLog::exception()` 产生的异常通知；
+- 未配置专用队列名时投递到 Laravel 的 `default` 队列；
 - 默认最多尝试 3 次，失败后等待 5 秒重试；
 - Job 只保存已经格式化和脱敏的通知文本；
 - Bot Token、Chat ID 和 HTTP Client 由 Worker 运行时解析。
@@ -18,7 +18,6 @@ Payload。
 
 ```php
 FoundationLog::exception('tron_rpc', $exception, $context);
-FoundationLog::message('payment', '付款处理完成', $context);
 ```
 
 完整队列配置和 Worker 命令见 [模块日志与异常通知](logging.md)。

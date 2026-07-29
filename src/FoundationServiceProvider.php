@@ -9,7 +9,6 @@ use Illuminate\Support\ServiceProvider;
 use Chencongbao\Foundation\Services\Tron\TronRpcClient;
 use Chencongbao\Foundation\Contracts\ClientIpResolver;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
-use Chencongbao\Foundation\Contracts\MessageNotifier;
 use Chencongbao\Foundation\Support\ConfigMerger;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
@@ -51,16 +50,10 @@ class FoundationServiceProvider extends ServiceProvider
             ExceptionNotifier::class,
             static fn ($app): ExceptionNotifier => $app->make(TelegramExceptionNotifier::class)
         );
-        $this->app->singleton(
-            MessageNotifier::class,
-            static fn ($app): MessageNotifier => $app->make(TelegramExceptionNotifier::class)
-        );
-
         $this->app->singleton(FoundationLogger::class, static fn ($app): FoundationLogger => new FoundationLogger(
             $app->make(LogManager::class),
             $app->make(ExceptionNotifier::class),
-            (array) $app['config']->get('foundation_log', []),
-            $app->make(MessageNotifier::class)
+            (array) $app['config']->get('foundation_log', [])
         ));
 
         $this->app->singleton(TronRpcClient::class, static fn ($app): TronRpcClient => new TronRpcClient(

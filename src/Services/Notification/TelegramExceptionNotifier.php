@@ -5,10 +5,9 @@ namespace Chencongbao\Foundation\Services\Notification;
 use Throwable;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
-use Chencongbao\Foundation\Contracts\MessageNotifier;
 use Chencongbao\Foundation\Jobs\SendTelegramNotification;
 
-final class TelegramExceptionNotifier implements ExceptionNotifier, MessageNotifier
+final class TelegramExceptionNotifier implements ExceptionNotifier
 {
     private TelegramNotificationSender $sender;
     private Dispatcher $dispatcher;
@@ -28,11 +27,6 @@ final class TelegramExceptionNotifier implements ExceptionNotifier, MessageNotif
     public function notify(string $module, Throwable $exception, array $context = []): bool
     {
         return $this->send($this->exceptionMessage($module, $exception, $context));
-    }
-
-    public function notifyMessage(string $module, string $message, array $context = []): bool
-    {
-        return $this->send($this->normalMessage($module, $message, $context));
     }
 
     private function send(string $message): bool
@@ -57,7 +51,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier, MessageNotif
             if ($connection !== '') {
                 $job->onConnection($connection);
             }
-            $queueName = trim((string) ($queue['name'] ?? 'foundation-notifications'));
+            $queueName = trim((string) ($queue['name'] ?? ''));
             if ($queueName !== '') {
                 $job->onQueue($queueName);
             }
@@ -78,23 +72,6 @@ final class TelegramExceptionNotifier implements ExceptionNotifier, MessageNotif
             'Exception: '.get_class($exception),
             'Message: '.$exception->getMessage(),
             'Code: '.(string) $exception->getCode(),
-            'Time: '.date(DATE_ATOM),
-        ];
-        if ($context !== []) {
-            $json = json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-            $lines[] = 'Context: '.($json === false ? '{}' : $json);
-        }
-
-        return substr(implode("\n", $lines), 0, 3900);
-    }
-
-    private function normalMessage(string $module, string $message, array $context): string
-    {
-        $lines = [
-            '['.(string) ($this->config['application'] ?? 'Laravel').'] Foundation message',
-            'Environment: '.(string) ($this->config['environment'] ?? 'unknown'),
-            'Module: '.$module,
-            'Message: '.$message,
             'Time: '.date(DATE_ATOM),
         ];
         if ($context !== []) {

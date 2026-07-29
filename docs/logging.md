@@ -1,7 +1,7 @@
 # 模块日志与异常通知
 
 核心默认配置为包内的 `config/foundation_log.php`，支持针对每个功能模块设置日志开关、
-最低级别、Laravel 日志 Channel 和异常通知开关。项目差异统一写入
+最低级别和 Laravel 日志 Channel。项目差异统一写入
 `config/foundation_custom.php`。
 
 发布项目差异配置：
@@ -20,7 +20,6 @@ return [
                 'enabled' => true,
                 'path' => storage_path('logs/{date}/foundation/payment.log'),
                 'level' => 'warning',
-                'notify' => false,
             ],
         ],
     ],
@@ -43,12 +42,10 @@ storage/logs/2026-07-29/foundation/client_ip.log
 FOUNDATION_LOG_TRON_RPC_ENABLED=true
 FOUNDATION_LOG_TRON_RPC_LEVEL=debug
 FOUNDATION_LOG_TRON_RPC_PATH=/绝对路径/logs/{date}/foundation/tron_rpc.log
-FOUNDATION_LOG_TRON_RPC_NOTIFY=false
 
 FOUNDATION_LOG_CLIENT_IP_ENABLED=false
 FOUNDATION_LOG_CLIENT_IP_LEVEL=info
 FOUNDATION_LOG_CLIENT_IP_PATH=/绝对路径/logs/{date}/foundation/client_ip.log
-FOUNDATION_LOG_CLIENT_IP_NOTIFY=false
 ```
 
 模块日志默认关闭，需要哪个模块就显式设置对应的 `FOUNDATION_LOG_*_ENABLED=true`。
@@ -89,10 +86,10 @@ FoundationLog::warning('payment', '付款匹配到多笔', $context);
 FoundationLog::error('tron_rpc', 'RPC 请求失败', $context);
 ```
 
-## 普通消息：本地日志和 Telegram 通知
+## 普通消息：只写本地日志
 
-`message()` 用于业务告警、任务完成提示等非异常消息。一次调用会分别检查模块的
-`enabled` 和 `notify` 开关：
+`message()` 用于记录业务过程、任务完成信息等普通消息，只写本地日志，不发送
+Telegram：
 
 ```php
 use Chencongbao\Foundation\Facades\FoundationLog;
@@ -104,9 +101,9 @@ FoundationLog::message('payment', '付款处理时间超过预期', [
 ```
 
 - `enabled=true` 时，消息会按传入级别写入模块日志；
-- `notify=true` 时，消息会发送到 Telegram；
+- `enabled=false` 时不写日志；
 - 第四个参数是日志级别，默认是 `info`；
-- 普通消息通知不会生成虚假的异常类、异常代码或调用栈。
+- 无论 Telegram 如何配置，`message()` 都不会发送通知。
 
 也可以通过依赖注入调用：
 
@@ -129,8 +126,11 @@ try {
 }
 ```
 
-`exception()` 会先按模块配置记录 `error` 日志；只有该模块 `notify=true` 时才尝试异常
-通知。
+`exception()` 会按模块的 `enabled` 配置决定是否记录 `error` 日志，并始终将异常交给
+Telegram 通知器。是否真正发送只由 Telegram 全局配置决定，不再设置模块通知开关。
+
+`debug()`、`info()`、`warning()`、`error()` 和 `message()` 都是纯日志方法，不发送
+通知。只有 `exception()` 会进入 Telegram 异常通知流程。
 
 ## Telegram 配置
 
@@ -138,11 +138,9 @@ try {
 FOUNDATION_TELEGRAM_ENABLED=true
 FOUNDATION_TELEGRAM_BOT_TOKEN=123456:bot-token
 FOUNDATION_TELEGRAM_CHAT_IDS=-1001234567890,-1009876543210
-FOUNDATION_TELEGRAM_MESSAGE_THREAD_ID=
 FOUNDATION_TELEGRAM_TIMEOUT=3
 
 FOUNDATION_TELEGRAM_QUEUE_ENABLED=true
-FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
 FOUNDATION_TELEGRAM_QUEUE_TRIES=3
 FOUNDATION_TELEGRAM_QUEUE_TIMEOUT=30
 FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
@@ -150,10 +148,9 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 
 真正发送必须同时满足：
 
-1. 模块 `notify=true`；
-2. `FOUNDATION_TELEGRAM_ENABLED=true`；
-3. Bot Token 非空；
-4. 至少配置一个 Chat ID。
+1. `FOUNDATION_TELEGRAM_ENABLED=true`；
+2. Bot Token 非空；
+3. 至少配置一个 Chat ID。
 
 任何一项不满足都不会发送。Telegram 请求失败只返回失败状态，不抛出异常，不影响原
 业务。
@@ -167,11 +164,10 @@ Telegram 通知默认通过 Laravel Queue 异步投递。业务请求只负责�
 
 ```dotenv
 QUEUE_CONNECTION=redis
-FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
 ```
 
 ```bash
-php artisan queue:work --queue=foundation-notifications
+php artisan queue:work
 ```
 
 Foundation 默认跟随宿主项目 `config/queue.php` 的 `default` 连接，也就是通常由
@@ -180,6 +176,19 @@ Foundation 默认跟随宿主项目 `config/queue.php` 的 `default` 连接，�
 
 ```dotenv
 FOUNDATION_TELEGRAM_QUEUE_CONNECTION=redis
+```
+
+Foundation 默认不指定队列名，通知 Job 会进入 Laravel 的 `default` 队列。如果希望
+异常通知使用独立队列，再配置：
+
+```dotenv
+FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
+```
+
+并启动对应队列 Worker：
+
+```bash
+php artisan queue:work --queue=foundation-notifications
 ```
 
 如果使用 Supervisor，请让 Supervisor 持续运行以上 Worker。发布新代码或修改包代码
@@ -201,9 +210,9 @@ FOUNDATION_TELEGRAM_QUEUE_ENABLED=false
 注意：仅设置 `FOUNDATION_TELEGRAM_QUEUE_ENABLED=true` 但项目
 `QUEUE_CONNECTION=sync` 时，Laravel 仍会在当前进程立即执行 Job，不属于真正异步。
 
-日志和通知开关相互独立：模块 `enabled` 只控制文件日志，模块 `notify` 只控制异常
-或普通消息通知。TRON RPC 的 `notify` 和 Telegram 全局 `enabled` 默认开启；未配置
-Bot Token 或 Chat ID 时仍不会发出请求。
+模块 `enabled` 只控制文件日志，不控制异常通知。所有 `exception()` 异常都会交给
+Telegram 通知器；`message()` 只写本地日志。Telegram 全局 `enabled` 默认开启，
+未配置 Bot Token 或 Chat ID 时异常不会入队，也不会发出请求。
 
 ## 敏感字段
 
