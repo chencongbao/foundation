@@ -50,7 +50,7 @@ return [
         'environment' => (string) env('APP_ENV', 'production'),
         'application' => (string) env('APP_NAME', 'Laravel'),
         // 留空时使用“[应用名称] 系统异常”；项目可覆盖，并支持 {application} 占位符。
-        'exception_title' => '',
+        'exception_title' => '[{application}] 异常告警',
         // 发送失败始终写入独立日志，不受 FOUNDATION_LOG_ENABLED 影响。
         'failure_log' => [
             'driver' => 'single',
