@@ -209,10 +209,23 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 }
 ```
 
-标题默认为 `TRON 异常`。`context.node` 会提升到顶层 `node`，没有传入时使用
-`APP_NAME`；异常文件尽量转换为宿主项目相对路径。超过 Telegram 长度限制时，过长的
-Context 会替换为 `truncated` 标记和 SHA-256 指纹，确保代码块中的正文始终是完整、
-可解析的 JSON。
+标题默认使用 `[节点名称] 系统异常`，例如 `[sg_robots] 系统异常`。`context.node`
+会提升到顶层 `node`，没有传入时使用 `APP_NAME`；异常文件尽量转换为宿主项目相对
+路径。超过 Telegram 长度限制时，过长的 Context 会替换为 `truncated` 标记和
+SHA-256 指纹，确保代码块中的正文始终是完整、可解析的 JSON。
+
+项目如需固定或自定义标题，可在 `config/foundation_custom.php` 中覆盖，`{node}` 会
+替换成当前节点名称：
+
+```php
+return [
+    'foundation_log' => [
+        'telegram' => [
+            'exception_title' => '[{node}] 异常告警',
+        ],
+    ],
+];
+```
 
 ## 相同异常去重
 

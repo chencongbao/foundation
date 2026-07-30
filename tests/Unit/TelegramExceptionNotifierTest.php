@@ -58,7 +58,7 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertStringContainsString('/bot123456:test-token/sendMessage', $requests[0]['uri']);
         $this->assertSame('-1001', $requests[0]['params']['chat_id']);
         $this->assertSame('HTML', $requests[0]['params']['parse_mode']);
-        $this->assertStringStartsWith('<b>TRON 异常</b>', $requests[0]['params']['text']);
+        $this->assertStringStartsWith('<b>[Robots] 系统异常</b>', $requests[0]['params']['text']);
         $message = $this->decodeNotification($requests[0]['params']['text']);
         $this->assertSame('Robots', $message['node']);
         $this->assertSame(RuntimeException::class, $message['exception']);
@@ -90,6 +90,7 @@ class TelegramExceptionNotifierTest extends TestCase
         ]));
 
         $message = $this->decodeNotification($requests[0]['params']['text']);
+        $this->assertStringStartsWith('<b>[tronweb4] 系统异常</b>', $requests[0]['params']['text']);
         $this->assertSame('tronweb4', $message['node']);
         $this->assertArrayNotHasKey('node', $message['context']);
         $this->assertSame('fullnode', $message['context']['pool']);
@@ -119,6 +120,29 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertLessThanOrEqual(3900, strlen($text));
         $this->assertTrue($message['context']['truncated']);
         $this->assertSame(64, strlen($message['context']['sha256']));
+    }
+
+    public function test_it_supports_a_custom_title_with_the_node_placeholder(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'application' => 'robots',
+            'exception_title' => '{node} 异常告警',
+            'queue' => ['enabled' => false],
+        ];
+        $notifier = $this->notifier($requests, $config);
+
+        $this->assertTrue($notifier->notify('command', new RuntimeException('command failed'), [
+            'node' => 'sg_robots',
+        ]));
+        $this->assertStringStartsWith(
+            '<b>sg_robots 异常告警</b>',
+            $requests[0]['params']['text']
+        );
     }
 
     public function test_it_dispatches_telegram_notifications_to_the_configured_queue(): void

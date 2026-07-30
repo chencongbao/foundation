@@ -179,7 +179,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         ];
 
         $json = $this->encodeMessage($payload);
-        $message = $this->formatMessage($json);
+        $message = $this->formatMessage($json, $node);
         if (strlen($message) <= 3900) {
             return $message;
         }
@@ -196,7 +196,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             'truncated' => true,
             'sha256' => hash('sha256', $contextJson === false ? serialize($context) : $contextJson),
         ];
-        $message = $this->formatMessage($this->encodeMessage($payload));
+        $message = $this->formatMessage($this->encodeMessage($payload), (string) $payload['node']);
         if (strlen($message) <= 3900) {
             return $message;
         }
@@ -204,7 +204,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         $payload['message'] = '[truncated sha256:'.hash('sha256', $exception->getMessage()).']';
         $payload['file'] = $this->truncateText((string) $payload['file'], 128);
 
-        return $this->formatMessage($this->encodeMessage($payload));
+        return $this->formatMessage($this->encodeMessage($payload), (string) $payload['node']);
     }
 
     private function encodeMessage(array $payload): string
@@ -221,12 +221,13 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         return $json === false ? '{}' : $json;
     }
 
-    private function formatMessage(string $json): string
+    private function formatMessage(string $json, string $node): string
     {
-        $title = $this->truncateText(
-            trim((string) ($this->config['exception_title'] ?? 'TRON 异常')),
-            128
-        );
+        $configuredTitle = trim((string) ($this->config['exception_title'] ?? ''));
+        $title = $configuredTitle === ''
+            ? '['.$node.'] 系统异常'
+            : str_replace('{node}', $node, $configuredTitle);
+        $title = $this->truncateText($title, 128);
 
         return '<b>'.htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</b>'
             ."\n"
