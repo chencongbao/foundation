@@ -41,6 +41,7 @@
             ],
             "aliases": {
                 "FoundationLog": "Chencongbao\\Foundation\\Facades\\FoundationLog",
+                "FoundationNotify": "Chencongbao\\Foundation\\Facades\\FoundationNotify",
                 "TronRpc": "Chencongbao\\Foundation\\Facades\\TronRpc"
             }
         }
