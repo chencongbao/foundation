@@ -15,6 +15,15 @@ return [
     ],
 
     /*
+     * 异常日志始终写入，不受全局或模块 enabled 开关影响，也不参与 Telegram 通知去重。
+     */
+    'exception' => [
+        'driver' => 'single',
+        'path' => storage_path('logs/{date}/foundation/exception.log'),
+        'level' => 'error',
+    ],
+
+    /*
      * 可在 foundation_custom.php 中添加任意模块。模块配置只覆盖 default 中的同名字段。
      */
     'modules' => [

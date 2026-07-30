@@ -34,7 +34,11 @@ return [
 ```text
 storage/logs/2026-07-29/foundation/tron_rpc.log
 storage/logs/2026-07-29/foundation/client_ip.log
+storage/logs/2026-07-29/foundation/exception.log
 ```
+
+前两个是受模块开关控制的普通日志。`exception.log` 是异常专用日志，始终写入，不受
+`FOUNDATION_LOG_ENABLED` 或任意模块 `enabled` 开关影响。
 
 独立开关和路径：
 
@@ -126,11 +130,41 @@ try {
 }
 ```
 
-`exception()` 会按模块的 `enabled` 配置决定是否记录 `error` 日志，并始终将异常交给
-Telegram 通知器。是否真正发送只由 Telegram 全局配置决定，不再设置模块通知开关。
+每次调用 `exception()` 都会先写入异常专用日志，再将异常交给 Telegram 通知器。
+是否真正发送只由 Telegram 全局配置和去重规则决定，不再设置模块通知开关。
+
+异常专用日志默认写入：
+
+```text
+storage/logs/YYYY-MM-DD/foundation/exception.log
+```
+
+每条异常日志包含：
+
+- 模块名、异常类、异常消息和错误代码；
+- 异常文件、行号和不包含函数参数的调用栈；
+- 最多 10 层前置异常链及其调用栈；
+- PHP SAPI、进程 ID、当前内存和峰值内存；
+- 调用 `exception()` 时传入并完成敏感字段脱敏的 Context。
+
+调用栈刻意不记录函数参数，避免 Token、密码或业务数据通过参数意外进入日志。异常日志
+写入失败不会阻断 Telegram 通知，也不会覆盖原始业务异常。
 
 `debug()`、`info()`、`warning()`、`error()` 和 `message()` 都是纯日志方法，不发送
 通知。只有 `exception()` 会进入 Telegram 异常通知流程。
+
+如需修改异常日志路径，可在 `config/foundation_custom.php` 中覆盖核心配置，无需修改
+包内配置文件：
+
+```php
+return [
+    'foundation_log' => [
+        'exception' => [
+            'path' => storage_path('logs/{date}/foundation/exception.log'),
+        ],
+    ],
+];
+```
 
 ## Telegram 配置
 
@@ -180,7 +214,8 @@ Telegram 异常默认去重 300 秒。同一模块、异常类和异常消息生
 模块 + 异常类 + 异常消息
 ```
 
-Context、异常文件和行号不参与指纹。本地日志不受去重影响，每次异常仍会完整记录。
+Context、异常文件和行号不参与指纹。异常专用日志完全不参与去重，每次异常都会详细
+记录，包括 Telegram 判断为重复而不发送的异常。
 去重使用 Laravel 默认 Cache；多台服务器需要使用 Redis 等共享缓存，才能实现跨服务器
 去重。缓存不可用时会跳过去重并继续通知，不影响原业务。
 
@@ -313,9 +348,10 @@ FOUNDATION_TELEGRAM_QUEUE_ENABLED=false
 注意：仅设置 `FOUNDATION_TELEGRAM_QUEUE_ENABLED=true` 但项目
 `QUEUE_CONNECTION=sync` 时，Laravel 仍会在当前进程立即执行 Job，不属于真正异步。
 
-模块 `enabled` 只控制文件日志，不控制异常通知。所有 `exception()` 异常都会交给
-Telegram 通知器；`message()` 只写本地日志。Telegram 全局 `enabled` 默认开启，
-未配置 Bot Token 或 Chat ID 时异常不会入队，也不会发出请求。
+模块 `enabled` 只控制普通模块日志，不控制异常专用日志和异常通知。所有
+`exception()` 异常都会写入异常专用日志并交给 Telegram 通知器；`message()` 只写
+普通模块日志。Telegram 全局 `enabled` 默认开启，未配置 Bot Token 或 Chat ID 时
+异常不会入队，也不会发出请求，但异常专用日志仍会正常写入。
 
 ## 敏感字段
 

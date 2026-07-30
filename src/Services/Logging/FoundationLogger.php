@@ -107,20 +107,82 @@ final class FoundationLogger
     public function exception(string $module, Throwable $exception, array $context = []): void
     {
         $module = $this->moduleName($module);
-        $settings = $this->moduleSettings($module);
-        $loggingEnabled = ($settings['enabled'] ?? false) === true;
-
         $safeContext = $this->sanitize($context);
-        if ($loggingEnabled) {
-            $this->log($module, LogLevel::ERROR, $exception->getMessage(), $safeContext + [
-                'exception' => get_class($exception),
-                'code' => $exception->getCode(),
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
-            ]);
+
+        try {
+            $this->writeExceptionLog($module, $exception, $safeContext);
+        } catch (Throwable) {
+            // 本地日志系统故障不能阻断异常通知，也不能覆盖原始业务异常。
         }
 
         $this->notifier->notify($module, $exception, $safeContext);
+    }
+
+    private function writeExceptionLog(string $module, Throwable $exception, array $context): void
+    {
+        $settings = array_replace([
+            'channel' => 'stack',
+            'driver' => 'single',
+            'path' => null,
+            'level' => LogLevel::ERROR,
+        ], (array) ($this->config['exception'] ?? []));
+
+        $cacheKey = $this->loggerCacheKey('exception', $settings);
+        $logger = $this->moduleLoggers[$cacheKey] ??= $this->moduleLogger($settings);
+        $logger->log(
+            LogLevel::ERROR,
+            '['.$module.'] '.$exception->getMessage(),
+            array_merge($context, $this->exceptionDetails($exception))
+        );
+    }
+
+    private function exceptionDetails(Throwable $exception): array
+    {
+        $previous = [];
+        $current = $exception->getPrevious();
+        $depth = 0;
+
+        while ($current !== null && $depth < 10) {
+            $previous[] = [
+                'exception' => get_class($current),
+                'message' => $current->getMessage(),
+                'code' => $current->getCode(),
+                'file' => $current->getFile(),
+                'line' => $current->getLine(),
+                'trace' => $this->safeTrace($current),
+            ];
+            $current = $current->getPrevious();
+            $depth++;
+        }
+
+        return [
+            'exception' => get_class($exception),
+            'exception_message' => $exception->getMessage(),
+            'code' => $exception->getCode(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => $this->safeTrace($exception),
+            'previous' => $previous,
+            'runtime' => [
+                'sapi' => PHP_SAPI,
+                'pid' => getmypid(),
+                'memory_usage' => memory_get_usage(true),
+                'memory_peak_usage' => memory_get_peak_usage(true),
+            ],
+        ];
+    }
+
+    private function safeTrace(Throwable $exception): array
+    {
+        return array_map(static function (array $frame): array {
+            return [
+                'file' => $frame['file'] ?? null,
+                'line' => $frame['line'] ?? null,
+                'class' => $frame['class'] ?? null,
+                'type' => $frame['type'] ?? null,
+                'function' => $frame['function'] ?? null,
+            ];
+        }, $exception->getTrace());
     }
 
     private function moduleSettings(string $module): array

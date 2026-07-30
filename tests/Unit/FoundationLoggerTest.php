@@ -24,7 +24,13 @@ class FoundationLoggerTest extends TestCase
             ->with('error', '[tron_rpc] RPC failed', Mockery::on(static function (array $context): bool {
                 return $context['token'] === '[REDACTED]'
                     && $context['nested']['authorization'] === '[REDACTED]'
-                    && $context['exception'] === RuntimeException::class;
+                    && $context['exception'] === RuntimeException::class
+                    && $context['exception_message'] === 'RPC failed'
+                    && is_string($context['file'])
+                    && is_int($context['line'])
+                    && is_array($context['trace'])
+                    && is_array($context['previous'])
+                    && is_array($context['runtime']);
             }));
 
         $logs = Mockery::mock(LogManager::class);
@@ -95,8 +101,13 @@ class FoundationLoggerTest extends TestCase
 
     public function test_exception_notification_is_independent_from_the_file_log_switch(): void
     {
+        $channel = Mockery::mock(LoggerInterface::class);
+        $channel->shouldReceive('log')
+            ->once()
+            ->with('error', '[tron_rpc] failed', Mockery::type('array'));
+
         $logs = Mockery::mock(LogManager::class);
-        $logs->shouldNotReceive('channel');
+        $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
         $logs->shouldNotReceive('build');
 
         $notifier = Mockery::mock(ExceptionNotifier::class);
@@ -116,8 +127,13 @@ class FoundationLoggerTest extends TestCase
 
     public function test_client_ip_exceptions_also_use_the_global_notifier(): void
     {
+        $channel = Mockery::mock(LoggerInterface::class);
+        $channel->shouldReceive('log')
+            ->once()
+            ->with('error', '[client_ip] resolve failed', Mockery::type('array'));
+
         $logs = Mockery::mock(LogManager::class);
-        $logs->shouldNotReceive('channel');
+        $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
         $logs->shouldNotReceive('build');
 
         $notifier = Mockery::mock(ExceptionNotifier::class);
@@ -129,6 +145,75 @@ class FoundationLoggerTest extends TestCase
         $logger = new FoundationLogger($logs, $notifier, $this->config());
         $logger->exception('client_ip', new RuntimeException('resolve failed'), [
             'host' => 'api.example.com',
+        ]);
+    }
+
+    public function test_every_exception_is_written_locally_even_when_notifications_may_be_deduplicated(): void
+    {
+        $channel = Mockery::mock(LoggerInterface::class);
+        $channel->shouldReceive('log')
+            ->twice()
+            ->with('error', '[tron_rpc] repeated failure', Mockery::type('array'));
+
+        $logs = Mockery::mock(LogManager::class);
+        $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
+
+        $notifier = Mockery::mock(ExceptionNotifier::class);
+        $notifier->shouldReceive('notify')->twice()->andReturn(true, false);
+
+        $config = $this->config();
+        $config['modules']['tron_rpc']['enabled'] = false;
+
+        $logger = new FoundationLogger($logs, $notifier, $config);
+        $logger->exception('tron_rpc', new RuntimeException('repeated failure'));
+        $logger->exception('tron_rpc', new RuntimeException('repeated failure'));
+    }
+
+    public function test_exception_log_contains_the_previous_exception_chain_without_arguments(): void
+    {
+        $channel = Mockery::mock(LoggerInterface::class);
+        $channel->shouldReceive('log')
+            ->once()
+            ->with('error', '[tron_rpc] outer failure', Mockery::on(static function (array $context): bool {
+                $frames = array_merge($context['trace'], $context['previous'][0]['trace']);
+
+                return $context['previous'][0]['exception'] === RuntimeException::class
+                    && $context['previous'][0]['message'] === 'root failure'
+                    && array_reduce($frames, static function (bool $safe, array $frame): bool {
+                        return $safe && !array_key_exists('args', $frame);
+                    }, true);
+            }));
+
+        $logs = Mockery::mock(LogManager::class);
+        $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
+
+        $notifier = Mockery::mock(ExceptionNotifier::class);
+        $notifier->shouldReceive('notify')->once()->andReturnTrue();
+
+        $previous = new RuntimeException('root failure');
+        $exception = new RuntimeException('outer failure', 0, $previous);
+
+        $logger = new FoundationLogger($logs, $notifier, $this->config());
+        $logger->exception('tron_rpc', $exception);
+    }
+
+    public function test_exception_log_failure_does_not_block_the_notification(): void
+    {
+        $logs = Mockery::mock(LogManager::class);
+        $logs->shouldReceive('channel')
+            ->once()
+            ->with('daily')
+            ->andThrow(new RuntimeException('logging unavailable'));
+
+        $notifier = Mockery::mock(ExceptionNotifier::class);
+        $notifier->shouldReceive('notify')
+            ->once()
+            ->with('tron_rpc', Mockery::type(RuntimeException::class), ['request_id' => 'rpc-2'])
+            ->andReturnTrue();
+
+        $logger = new FoundationLogger($logs, $notifier, $this->config());
+        $logger->exception('tron_rpc', new RuntimeException('RPC failed'), [
+            'request_id' => 'rpc-2',
         ]);
     }
 
@@ -215,6 +300,11 @@ class FoundationLoggerTest extends TestCase
                 'enabled' => true,
                 'channel' => 'stack',
                 'level' => 'debug',
+            ],
+            'exception' => [
+                'channel' => 'daily',
+                'path' => null,
+                'level' => 'error',
             ],
             'modules' => [
                 'tron_rpc' => [
