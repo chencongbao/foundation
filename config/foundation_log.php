@@ -4,6 +4,16 @@ use Chencongbao\Foundation\Support\ConfigList;
 
 return [
     /*
+     * 自动清理 storage/logs 下所有 YYYY-MM-DD 日期目录。
+     * days 表示包含今天在内保留的自然日数量；设为 0 可关闭自动清理。
+     * 清理在 Foundation Provider 启动时触发，每天最多执行一次，不需要定时任务。
+     */
+    'retention' => [
+        'days' => max(0, (int) env('FOUNDATION_LOG_RETENTION_DAYS', 30)),
+        'path' => storage_path('logs'),
+    ],
+
+    /*
      * 未单独配置的模块继承 default。channel 必须存在于宿主项目 config/logging.php。
      */
     'default' => [

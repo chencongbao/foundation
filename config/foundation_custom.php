@@ -13,6 +13,10 @@
 | 示例：
 |
 | 'foundation_log' => [
+|     'retention' => [
+|         // 保留全部按日期目录存放的项目日志天数；0 表示关闭自动清理。
+|         'days' => 30,
+|     ],
 |     'modules' => [
 |         'payment' => [
 |             'enabled' => true,

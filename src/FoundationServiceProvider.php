@@ -2,6 +2,7 @@
 
 namespace Chencongbao\Foundation;
 
+use Throwable;
 use GuzzleHttp\Client;
 use Illuminate\Log\LogManager;
 use Illuminate\Contracts\Bus\Dispatcher;
@@ -11,6 +12,7 @@ use Chencongbao\Foundation\Services\Tron\TronRpcClient;
 use Chencongbao\Foundation\Contracts\ClientIpResolver;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
 use Chencongbao\Foundation\Support\ConfigMerger;
+use Chencongbao\Foundation\Services\Logging\DailyLogCleaner;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
 use Chencongbao\Foundation\Services\Notification\TelegramExceptionNotifier;
@@ -69,6 +71,9 @@ class FoundationServiceProvider extends ServiceProvider
             $app->make(ExceptionNotifier::class),
             (array) $app['config']->get('foundation_log', [])
         ));
+        $this->app->singleton(DailyLogCleaner::class, static fn ($app): DailyLogCleaner => new DailyLogCleaner(
+            (array) $app['config']->get('foundation_log.retention', [])
+        ));
 
         $this->app->singleton(TronRpcClient::class, static fn ($app): TronRpcClient => new TronRpcClient(
             (array) $app['config']->get('tron_rpc.endpoints', []),
@@ -83,6 +88,12 @@ class FoundationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        try {
+            $this->app->make(DailyLogCleaner::class)->cleanup();
+        } catch (Throwable) {
+            // 自动清理失败不能阻断宿主项目启动。
+        }
+
         $this->publishes([
             __DIR__.'/../config/foundation_custom.php' => config_path('foundation_custom.php'),
         ], 'foundation-custom-config');

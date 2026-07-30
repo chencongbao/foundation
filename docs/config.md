@@ -28,6 +28,10 @@ config/foundation_custom.php
 ```php
 return [
     'foundation_log' => [
+        'retention' => [
+            // 自动删除 storage/logs 下过期的 YYYY-MM-DD 日期目录；0 表示关闭。
+            'days' => 30,
+        ],
         'modules' => [
             'payment' => [
                 'enabled' => true,

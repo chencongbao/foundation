@@ -10,6 +10,36 @@
 php artisan vendor:publish --tag=foundation-custom-config
 ```
 
+## 日志自动保留
+
+Foundation 会自动清理 `storage/logs` 下名称严格为 `YYYY-MM-DD` 的过期日期目录。
+清理的是整个日期目录，因此该日期中的 Foundation、业务模块及其他项目日志都会一起删除；
+普通文件、非日期目录和日期目录符号链接不会被处理。
+
+默认保留包含今天在内的 30 个自然日，可通过环境变量统一修改：
+
+```dotenv
+FOUNDATION_LOG_RETENTION_DAYS=30
+```
+
+设为 `0` 可关闭自动清理。清理在 Provider 启动时触发，通过文件锁确保每天最多实际扫描
+一次，不依赖 Laravel Scheduler、Cron 或 MongoDB TTL。修改保留天数后，即使当天已经
+清理过也会按新配置重新执行。
+
+如果项目的按日日志根目录不在 `storage/logs`，可在 `config/foundation_custom.php`
+覆盖路径：
+
+```php
+return [
+    'foundation_log' => [
+        'retention' => [
+            'days' => 15,
+            'path' => storage_path('custom-logs'),
+        ],
+    ],
+];
+```
+
 ## 模块配置
 
 ```php
