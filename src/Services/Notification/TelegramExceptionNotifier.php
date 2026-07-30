@@ -145,10 +145,8 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             if ($connection !== '') {
                 $job->onConnection($connection);
             }
-            $queueName = trim((string) ($queue['name'] ?? ''));
-            if ($queueName !== '') {
-                $job->onQueue($queueName);
-            }
+            $queueName = trim((string) ($queue['name'] ?? 'notice'));
+            $job->onQueue($queueName !== '' ? $queueName : 'notice');
             $this->dispatcher->dispatch($job);
 
             return true;

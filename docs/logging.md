@@ -141,6 +141,7 @@ FOUNDATION_TELEGRAM_CHAT_IDS=-1001234567890,-1009876543210
 FOUNDATION_TELEGRAM_TIMEOUT=3
 
 FOUNDATION_TELEGRAM_QUEUE_ENABLED=true
+FOUNDATION_TELEGRAM_QUEUE=notice
 FOUNDATION_TELEGRAM_QUEUE_TRIES=3
 FOUNDATION_TELEGRAM_QUEUE_TIMEOUT=30
 FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
@@ -249,7 +250,7 @@ QUEUE_CONNECTION=redis
 ```
 
 ```bash
-php artisan queue:work
+php artisan queue:work --queue=notice
 ```
 
 Foundation 默认跟随宿主项目 `config/queue.php` 的 `default` 连接，也就是通常由
@@ -260,17 +261,22 @@ Foundation 默认跟随宿主项目 `config/queue.php` 的 `default` 连接，�
 FOUNDATION_TELEGRAM_QUEUE_CONNECTION=redis
 ```
 
-Foundation 默认不指定队列名，通知 Job 会进入 Laravel 的 `default` 队列。如果希望
-异常通知使用独立队列，再配置：
+Foundation 默认将通知 Job 投递到 `notice` 队列：
 
 ```dotenv
-FOUNDATION_TELEGRAM_QUEUE=foundation-notifications
+FOUNDATION_TELEGRAM_QUEUE=notice
 ```
 
-并启动对应队列 Worker：
+如果配置其他名称，则使用配置的队列：
+
+```dotenv
+FOUNDATION_TELEGRAM_QUEUE=telegram-alerts
+```
+
+Worker 必须监听最终使用的队列名：
 
 ```bash
-php artisan queue:work --queue=foundation-notifications
+php artisan queue:work --queue=telegram-alerts
 ```
 
 如果使用 Supervisor，请让 Supervisor 持续运行以上 Worker。发布新代码或修改包代码

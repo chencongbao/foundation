@@ -96,7 +96,7 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertSame([], $requests);
     }
 
-    public function test_it_uses_the_laravel_default_queue_when_no_queue_name_is_configured(): void
+    public function test_it_uses_the_notice_queue_when_no_queue_name_is_configured(): void
     {
         $requests = [];
         $config = [
@@ -115,7 +115,7 @@ class TelegramExceptionNotifierTest extends TestCase
             ->with(Mockery::on(static function ($job): bool {
                 return $job instanceof SendTelegramNotification
                     && $job->connection === null
-                    && $job->queue === null;
+                    && $job->queue === 'notice';
             }))
             ->andReturn('job-id');
         $notifier = new TelegramExceptionNotifier($sender, $dispatcher, $config);

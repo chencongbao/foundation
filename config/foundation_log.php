@@ -50,8 +50,8 @@ return [
             'enabled' => (bool) env('FOUNDATION_TELEGRAM_QUEUE_ENABLED', true),
             // 留空时跟随宿主项目 queue.default（即 QUEUE_CONNECTION）。
             'connection' => env('FOUNDATION_TELEGRAM_QUEUE_CONNECTION'),
-            // 留空时投递到 Laravel 的 default 队列。
-            'name' => (string) env('FOUNDATION_TELEGRAM_QUEUE', ''),
+            // 未配置时投递到 notice 队列；环境变量可覆盖队列名。
+            'name' => trim((string) env('FOUNDATION_TELEGRAM_QUEUE', 'notice')) ?: 'notice',
             'tries' => max(1, (int) env('FOUNDATION_TELEGRAM_QUEUE_TRIES', 3)),
             'timeout_seconds' => max(1, (int) env('FOUNDATION_TELEGRAM_QUEUE_TIMEOUT', 30)),
             'backoff_seconds' => max(0, (int) env('FOUNDATION_TELEGRAM_QUEUE_BACKOFF', 5)),
