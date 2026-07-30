@@ -62,6 +62,23 @@ Foundation 的 Telegram 异常通知默认投递到 Laravel Queue。生产环境
 配置 `FOUNDATION_TELEGRAM_QUEUE` 后使用指定队列。详细配置见
 [模块日志与异常通知](docs/logging.md)。
 
+## TRON 基础工具
+
+不需要调用节点的地址校验、地址格式转换和数量换算使用 `Support\Tron`：
+
+```php
+use Chencongbao\Foundation\Support\Tron;
+
+$valid = Tron::isValidAddress($address);
+$validHash = Tron::isHash($hash);
+$hexAddress = Tron::toHexAddress($address);
+$base58Address = Tron::toBase58Address($hexAddress);
+$sun = Tron::trxToSun('1.25');
+$trx = Tron::sunToTrx($sun);
+```
+
+完整方法见 [Support 通用工具](docs/support.md)。
+
 ## TRON 内网 RPC
 
 包会通过 Laravel Package Discovery 自动注册 `TronRpcClient` 和 `TronRpc` Facade。
