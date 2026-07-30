@@ -40,7 +40,8 @@ class FoundationServiceProvider extends ServiceProvider
 
         $this->app->singleton(TelegramNotificationSender::class, static fn ($app): TelegramNotificationSender => new TelegramNotificationSender(
             new Client(),
-            (array) $app['config']->get('foundation_log.telegram', [])
+            (array) $app['config']->get('foundation_log.telegram', []),
+            $app->make(LogManager::class)
         ));
         $this->app->singleton(TelegramExceptionNotifier::class, static fn ($app): TelegramExceptionNotifier => new TelegramExceptionNotifier(
             $app->make(TelegramNotificationSender::class),

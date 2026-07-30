@@ -35,9 +35,11 @@ return [
 storage/logs/2026-07-29/foundation/tron_rpc.log
 storage/logs/2026-07-29/foundation/client_ip.log
 storage/logs/2026-07-29/foundation/exception.log
+storage/logs/2026-07-29/foundation/telegram.log
 ```
 
-前两个是受模块开关控制的普通日志。`exception.log` 是异常专用日志，始终写入，不受
+前两个是受模块开关控制的普通日志。`exception.log` 是异常专用日志，
+`telegram.log` 是 Telegram 发送失败日志；后两个始终写入，不受
 `FOUNDATION_LOG_ENABLED` 或任意模块 `enabled` 开关影响。
 
 独立开关和路径：
@@ -338,6 +340,32 @@ php artisan queue:restart
 
 发送失败时 Job 会抛出异常，由 Laravel Queue 按 `TRIES` 和 `BACKOFF` 配置重试。
 Job 只序列化通知文本，不会把 Telegram Bot Token 和 Chat ID 写入队列 Payload。
+
+每次 Telegram API 返回失败、发生网络异常、队列任务发送失败或任务无法投递到队列时，
+Foundation 都会写入：
+
+```text
+storage/logs/YYYY-MM-DD/foundation/telegram.log
+```
+
+日志包含 Chat ID、HTTP 状态、Telegram `error_code` 和 `description`、异常类、
+异常位置、当前重试次数、队列和连接名称。通知正文只记录 SHA-256 指纹，不写入原文；
+Bot Token、Authorization 和 Secret 会脱敏。失败日志不受普通日志开关影响，日志写入
+自身发生故障时也不会阻断业务或队列重试。
+
+如需修改失败日志路径，在 `config/foundation_custom.php` 中覆盖：
+
+```php
+return [
+    'foundation_log' => [
+        'telegram' => [
+            'failure_log' => [
+                'path' => storage_path('logs/{date}/foundation/telegram.log'),
+            ],
+        ],
+    ],
+];
+```
 
 如需本地调试时恢复同步发送：
 

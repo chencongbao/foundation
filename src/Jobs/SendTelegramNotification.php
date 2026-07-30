@@ -31,6 +31,14 @@ final class SendTelegramNotification implements ShouldQueue
     public function handle(TelegramNotificationSender $sender): void
     {
         if (!$sender->send($this->message)) {
+            $sender->reportFailure('Telegram 队列任务发送失败，等待重试', [
+                'attempt' => $this->attempts(),
+                'tries' => $this->tries,
+                'queue' => $this->queue,
+                'connection' => $this->connection,
+                'message_hash' => hash('sha256', $this->message),
+            ]);
+
             throw new RuntimeException('Foundation Telegram 通知发送失败。');
         }
     }

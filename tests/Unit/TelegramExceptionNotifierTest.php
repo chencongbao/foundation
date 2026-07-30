@@ -7,7 +7,9 @@ use RuntimeException;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Promise\Create;
+use Illuminate\Log\LogManager;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Http\Message\RequestInterface;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
@@ -126,6 +128,53 @@ class TelegramExceptionNotifierTest extends TestCase
         $notifier = new TelegramExceptionNotifier($sender, $dispatcher, $config);
 
         $this->assertTrue($notifier->notify('tron_rpc', new RuntimeException('queued exception')));
+        $this->assertSame([], $requests);
+    }
+
+    public function test_it_logs_a_queue_dispatch_failure(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'queue' => [
+                'enabled' => true,
+                'connection' => 'redis',
+                'name' => 'notice',
+            ],
+            'failure_log' => [
+                'channel' => 'daily',
+                'path' => null,
+            ],
+        ];
+
+        $logger = Mockery::mock(LoggerInterface::class);
+        $logger->shouldReceive('error')
+            ->once()
+            ->with('[telegram] Telegram 通知任务投递队列失败', Mockery::on(static function (array $context): bool {
+                return $context['exception'] === RuntimeException::class
+                    && $context['exception_message'] === 'Redis unavailable'
+                    && $context['queue'] === 'notice'
+                    && $context['connection'] === 'redis'
+                    && strlen($context['message_hash']) === 64;
+            }));
+        $logs = Mockery::mock(LogManager::class);
+        $logs->shouldReceive('channel')->once()->with('daily')->andReturn($logger);
+
+        $dispatcher = Mockery::mock(Dispatcher::class);
+        $dispatcher->shouldReceive('dispatch')
+            ->once()
+            ->andThrow(new RuntimeException('Redis unavailable'));
+
+        $notifier = new TelegramExceptionNotifier(
+            new TelegramNotificationSender($this->client($requests), $config, $logs),
+            $dispatcher,
+            $config
+        );
+
+        $this->assertFalse($notifier->notify('tron_rpc', new RuntimeException('RPC failed')));
         $this->assertSame([], $requests);
     }
 

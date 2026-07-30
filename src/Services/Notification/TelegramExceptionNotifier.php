@@ -150,7 +150,16 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             $this->dispatcher->dispatch($job);
 
             return true;
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            $this->sender->reportFailure('Telegram 通知任务投递队列失败', [
+                'exception' => get_class($exception),
+                'exception_message' => $exception->getMessage(),
+                'exception_code' => $exception->getCode(),
+                'queue' => (string) ($queue['name'] ?? 'notice'),
+                'connection' => (string) ($queue['connection'] ?? ''),
+                'message_hash' => hash('sha256', $message),
+            ]);
+
             return false;
         }
     }

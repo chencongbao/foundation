@@ -49,6 +49,12 @@ return [
         'timeout_seconds' => max(0.5, (float) env('FOUNDATION_TELEGRAM_TIMEOUT', 3)),
         'environment' => (string) env('APP_ENV', 'production'),
         'application' => (string) env('APP_NAME', 'Laravel'),
+        // 发送失败始终写入独立日志，不受 FOUNDATION_LOG_ENABLED 影响。
+        'failure_log' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/{date}/foundation/telegram.log'),
+            'level' => 'error',
+        ],
         // 相同模块、异常类和异常内容在此时间内只通知一次；设为 0 可关闭去重。
         'deduplicate_seconds' => 300,
         // 项目可在 foundation_custom.php 中指定参与指纹的 Context 点号路径。
