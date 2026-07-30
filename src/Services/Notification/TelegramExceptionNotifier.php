@@ -7,10 +7,9 @@ use Illuminate\Support\Arr;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
-use Chencongbao\Foundation\Contracts\MessageNotifier;
 use Chencongbao\Foundation\Jobs\SendTelegramNotification;
 
-final class TelegramExceptionNotifier implements ExceptionNotifier, MessageNotifier
+final class TelegramExceptionNotifier implements ExceptionNotifier
 {
     private TelegramNotificationSender $sender;
     private Dispatcher $dispatcher;
@@ -51,16 +50,6 @@ final class TelegramExceptionNotifier implements ExceptionNotifier, MessageNotif
         }
 
         return $sent;
-    }
-
-    public function message(string $module, string $message, array $context = []): bool
-    {
-        return $this->send($this->normalMessage($module, $message, $context));
-    }
-
-    public function notifyMessage(string $module, string $message, array $context = []): bool
-    {
-        return $this->message($module, $message, $context);
     }
 
     /**
@@ -177,23 +166,6 @@ final class TelegramExceptionNotifier implements ExceptionNotifier, MessageNotif
             'Exception: '.get_class($exception),
             'Message: '.$exception->getMessage(),
             'Code: '.(string) $exception->getCode(),
-            'Time: '.date(DATE_ATOM),
-        ];
-        if ($context !== []) {
-            $json = json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-            $lines[] = 'Context: '.($json === false ? '{}' : $json);
-        }
-
-        return substr(implode("\n", $lines), 0, 3900);
-    }
-
-    private function normalMessage(string $module, string $message, array $context): string
-    {
-        $lines = [
-            '['.(string) ($this->config['application'] ?? 'Laravel').'] Foundation notification',
-            'Environment: '.(string) ($this->config['environment'] ?? 'unknown'),
-            'Module: '.$module,
-            'Message: '.$message,
             'Time: '.date(DATE_ATOM),
         ];
         if ($context !== []) {

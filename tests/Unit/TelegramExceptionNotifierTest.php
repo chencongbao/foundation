@@ -270,33 +270,6 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertCount(2, $requests);
     }
 
-    public function test_normal_notifications_are_sent_without_exception_deduplication(): void
-    {
-        $requests = [];
-        $config = [
-            'enabled' => true,
-            'bot_token' => '123456:test-token',
-            'chat_ids' => ['-1001'],
-            'timeout_seconds' => 3,
-            'deduplicate_seconds' => 300,
-            'queue' => ['enabled' => false],
-        ];
-        $cache = Mockery::mock(CacheRepository::class);
-        $cache->shouldNotReceive('add');
-        $notifier = new TelegramExceptionNotifier(
-            new TelegramNotificationSender($this->client($requests), $config),
-            Mockery::mock(Dispatcher::class),
-            $config,
-            $cache
-        );
-
-        $this->assertTrue($notifier->message('console_command', 'Command finished'));
-        $this->assertTrue($notifier->message('console_command', 'Command finished'));
-        $this->assertCount(2, $requests);
-        $this->assertStringContainsString('Foundation notification', $requests[0]['params']['text']);
-        $this->assertStringNotContainsString('Exception:', $requests[0]['params']['text']);
-    }
-
     private function notifier(array &$requests, array $config): TelegramExceptionNotifier
     {
         return new TelegramExceptionNotifier(

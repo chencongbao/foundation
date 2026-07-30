@@ -132,23 +132,6 @@ Telegram 通知器。是否真正发送只由 Telegram 全局配置决定，不�
 `debug()`、`info()`、`warning()`、`error()` 和 `message()` 都是纯日志方法，不发送
 通知。只有 `exception()` 会进入 Telegram 异常通知流程。
 
-## 显式普通 Telegram 通知
-
-需要发送不带异常对象的业务通知时，使用独立的 `FoundationNotify`，不要使用
-`FoundationLog::message()`：
-
-```php
-use Chencongbao\Foundation\Facades\FoundationNotify;
-
-FoundationNotify::message('console_command', 'Artisan 命令执行完成', [
-    'command' => 'tron:cleanup-transactions',
-    'exit_code' => 0,
-]);
-```
-
-该入口只发送 Telegram，不写本地日志，也不参与异常去重。Telegram 是否启用、异步
-队列连接和队列名称仍使用同一份全局配置。
-
 ## Telegram 配置
 
 ```dotenv
