@@ -37,6 +37,11 @@ return [
             'path' => (string) env('FOUNDATION_LOG_CLIENT_IP_PATH', storage_path('logs/{date}/foundation/client_ip.log')),
             'level' => (string) env('FOUNDATION_LOG_CLIENT_IP_LEVEL', 'info'),
         ],
+        'telegram' => [
+            'enabled' => (bool) env('FOUNDATION_LOG_TELEGRAM_ENABLED', false),
+            'path' => (string) env('FOUNDATION_LOG_TELEGRAM_PATH', storage_path('logs/{date}/foundation/telegram.log')),
+            'level' => (string) env('FOUNDATION_LOG_TELEGRAM_LEVEL', 'info'),
+        ],
     ],
 
     /*
@@ -51,10 +56,10 @@ return [
         'application' => (string) env('APP_NAME', 'Laravel'),
         // 留空时使用“[应用名称] 系统异常”；项目可覆盖，并支持 {application} 占位符。
         'exception_title' => '[{application}] 异常告警',
-        // 发送失败始终写入独立日志，不受 FOUNDATION_LOG_ENABLED 影响。
+        // Telegram 失败日志始终写入，不受 FOUNDATION_LOG_ENABLED 或模块开关影响。
         'failure_log' => [
             'driver' => 'single',
-            'path' => storage_path('logs/{date}/foundation/telegram.log'),
+            'path' => storage_path('logs/{date}/foundation/telegram_failure.log'),
             'level' => 'error',
         ],
         // 相同模块、异常类和异常内容在此时间内只通知一次；设为 0 可关闭去重。

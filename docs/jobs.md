@@ -23,7 +23,7 @@ FoundationLog::exception('tron_rpc', $exception, $context);
 
 Job 发送失败时抛出专用的 `TelegramTransportException`，让 Laravel Queue 正常重试并
 在最终失败后写入 `failed_jobs`。异常的 `report()` 会阻止 Laravel 全局异常 Handler
-再次发送 Telegram；Foundation 已经将传输失败详情写入 `telegram.log`。宿主项目不再
+再次发送 Telegram；Foundation 已经将传输失败详情写入 `telegram_failure.log`。宿主项目不再
 需要通过 vendor 文件路径识别这个异常。
 
 完整队列配置和 Worker 命令见 [模块日志与异常通知](logging.md)。

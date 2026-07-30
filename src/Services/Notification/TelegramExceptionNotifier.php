@@ -150,6 +150,15 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             $queueName = trim((string) ($queue['name'] ?? 'notice'));
             $job->onQueue($queueName !== '' ? $queueName : 'notice');
             $this->dispatcher->dispatch($job);
+            $this->sender->reportActivity('Telegram 通知任务已投递', [
+                'queue' => $job->queue,
+                'connection' => $job->connection,
+                'tries' => $job->tries,
+                'timeout_seconds' => $job->timeout,
+                'backoff_seconds' => $job->backoff(),
+                'message_bytes' => strlen($message),
+                'message_hash' => hash('sha256', $message),
+            ]);
 
             return true;
         } catch (Throwable $exception) {

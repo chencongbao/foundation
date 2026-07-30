@@ -12,7 +12,8 @@ use Stringable;
  * 发送项目自定义 Telegram 消息。
  *
  * 与异常通知器分离，可按次覆盖 Bot Token 和 Chat ID；发送失败返回 false，并复用
- * Foundation 的 telegram.log 记录失败详情。
+ * modules.telegram 开启时成功操作写入 telegram.log，失败详情始终写入
+ * telegram_failure.log。
  */
 final class TelegramMessenger
 {
@@ -174,6 +175,47 @@ final class TelegramMessenger
     public function sendJson(mixed $data): bool
     {
         return $this->sendHtml($this->format($data, 'json'));
+    }
+
+    /**
+     * 设置当前机器人的 Telegram Webhook。
+     *
+     * 支持 ip_address、max_connections、allowed_updates、drop_pending_updates、
+     * secret_token 参数。
+     */
+    public function setWebhook(string $url, array $options = []): bool
+    {
+        $url = trim($url);
+        if (
+            filter_var($url, FILTER_VALIDATE_URL) === false
+            || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https'
+        ) {
+            throw new InvalidArgumentException('Telegram Webhook 地址必须是有效的 HTTPS URL。');
+        }
+
+        $params = ['url' => $url] + $this->normalizeWebhookOptions($options);
+
+        return $this->sender()->call('setWebhook', $params) === true;
+    }
+
+    /**
+     * 删除当前机器人的 Telegram Webhook。
+     */
+    public function removeWebhook(bool $dropPendingUpdates = false): bool
+    {
+        return $this->sender()->call('deleteWebhook', [
+            'drop_pending_updates' => $dropPendingUpdates,
+        ]) === true;
+    }
+
+    /**
+     * 获取当前机器人的 Telegram Webhook 状态；失败时返回空数组。
+     */
+    public function getWebhookInfo(): array
+    {
+        $result = $this->sender()->call('getWebhookInfo');
+
+        return is_array($result) ? $result : [];
     }
 
     private function codeBlock(string $content, string $language, ?string $title): string
@@ -344,6 +386,68 @@ final class TelegramMessenger
             'text' => $text,
             'url' => trim((string) $button['url']),
         ];
+    }
+
+    private function normalizeWebhookOptions(array $options): array
+    {
+        $allowed = [
+            'ip_address',
+            'max_connections',
+            'allowed_updates',
+            'drop_pending_updates',
+            'secret_token',
+        ];
+        $unknown = array_diff(array_keys($options), $allowed);
+        if ($unknown !== []) {
+            throw new InvalidArgumentException(
+                '不支持的 Telegram Webhook 参数：'.implode(', ', $unknown)
+            );
+        }
+
+        if (isset($options['max_connections'])) {
+            $maxConnections = (int) $options['max_connections'];
+            if ($maxConnections < 1 || $maxConnections > 100) {
+                throw new InvalidArgumentException(
+                    'Telegram Webhook max_connections 必须在 1 到 100 之间。'
+                );
+            }
+            $options['max_connections'] = $maxConnections;
+        }
+
+        if (array_key_exists('allowed_updates', $options)) {
+            if (!is_array($options['allowed_updates'])) {
+                throw new InvalidArgumentException(
+                    'Telegram Webhook allowed_updates 必须是数组。'
+                );
+            }
+            $options['allowed_updates'] = json_encode(
+                array_values($options['allowed_updates']),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            );
+        }
+
+        if (isset($options['secret_token'])) {
+            $secretToken = trim((string) $options['secret_token']);
+            if (preg_match('/^[A-Za-z0-9_-]{1,256}$/', $secretToken) !== 1) {
+                throw new InvalidArgumentException(
+                    'Telegram Webhook secret_token 格式无效。'
+                );
+            }
+            $options['secret_token'] = $secretToken;
+        }
+
+        if (array_key_exists('drop_pending_updates', $options)) {
+            $options['drop_pending_updates'] = (bool) $options['drop_pending_updates'];
+        }
+        if (isset($options['ip_address'])) {
+            $ipAddress = trim((string) $options['ip_address']);
+            if (filter_var($ipAddress, FILTER_VALIDATE_IP) === false) {
+                throw new InvalidArgumentException('Telegram Webhook ip_address 格式无效。');
+            }
+            $options['ip_address'] = $ipAddress;
+        }
+
+        return $options;
     }
 
     private function normalizeChatIds(array|string $chatIds): array

@@ -41,13 +41,13 @@ class FoundationServiceProvider extends ServiceProvider
 
         $this->app->singleton(TelegramNotificationSender::class, static fn ($app): TelegramNotificationSender => new TelegramNotificationSender(
             new Client(),
-            (array) $app['config']->get('foundation_log.telegram', []),
+            self::telegramConfig($app),
             $app->make(LogManager::class)
         ));
         $this->app->singleton(TelegramMessenger::class, static fn ($app): TelegramMessenger => new TelegramMessenger(
             new Client(),
             $app->make(LogManager::class),
-            (array) $app['config']->get('foundation_log.telegram', [])
+            self::telegramConfig($app)
         ));
         $this->app->singleton(TelegramExceptionNotifier::class, static fn ($app): TelegramExceptionNotifier => new TelegramExceptionNotifier(
             $app->make(TelegramNotificationSender::class),
@@ -99,5 +99,15 @@ class FoundationServiceProvider extends ServiceProvider
                 ConfigMerger::replaceRecursive((array) $config->get($key, []), $overrides)
             );
         }
+    }
+
+    private static function telegramConfig($app): array
+    {
+        $config = (array) $app['config']->get('foundation_log.telegram', []);
+        $defaultLog = (array) $app['config']->get('foundation_log.default', []);
+        $moduleLog = (array) $app['config']->get('foundation_log.modules.telegram', []);
+        $config['activity_log'] = array_replace($defaultLog, $moduleLog);
+
+        return $config;
     }
 }

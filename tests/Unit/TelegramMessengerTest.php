@@ -307,6 +307,68 @@ class TelegramMessengerTest extends TestCase
         $messenger->sendJson('{invalid json}');
     }
 
+    public function test_it_sets_a_webhook_with_a_custom_token_and_options(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->assertTrue(
+            $messenger
+                ->withToken('999999:webhook-token')
+                ->setWebhook('https://example.com/telegram/webhook', [
+                    'max_connections' => 20,
+                    'allowed_updates' => ['message', 'callback_query'],
+                    'drop_pending_updates' => true,
+                    'secret_token' => 'webhook_secret-123',
+                ])
+        );
+
+        $this->assertStringContainsString(
+            '/bot999999:webhook-token/setWebhook',
+            $requests[0]['uri']
+        );
+        $this->assertSame('https://example.com/telegram/webhook', $requests[0]['params']['url']);
+        $this->assertSame('20', $requests[0]['params']['max_connections']);
+        $this->assertSame(
+            ['message', 'callback_query'],
+            json_decode($requests[0]['params']['allowed_updates'], true)
+        );
+        $this->assertSame('1', $requests[0]['params']['drop_pending_updates']);
+        $this->assertSame('webhook_secret-123', $requests[0]['params']['secret_token']);
+    }
+
+    public function test_it_removes_a_webhook_and_can_drop_pending_updates(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->assertTrue($messenger->removeWebhook(true));
+        $this->assertStringContainsString('/deleteWebhook', $requests[0]['uri']);
+        $this->assertSame('1', $requests[0]['params']['drop_pending_updates']);
+    }
+
+    public function test_it_gets_webhook_information(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->assertSame([
+            'url' => 'https://example.com/telegram/webhook',
+            'pending_update_count' => 2,
+        ], $messenger->getWebhookInfo());
+        $this->assertStringContainsString('/getWebhookInfo', $requests[0]['uri']);
+    }
+
+    public function test_it_rejects_an_invalid_webhook_url(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('必须是有效的 HTTPS URL');
+        $messenger->setWebhook('http://example.com/webhook');
+    }
+
     private function messenger(array &$requests): TelegramMessenger
     {
         $handler = static function (RequestInterface $request, array $_options) use (&$requests) {
@@ -317,9 +379,18 @@ class TelegramMessengerTest extends TestCase
                 'params' => $params,
             ];
 
+            $path = $request->getUri()->getPath();
+            if (str_ends_with($path, '/setWebhook') || str_ends_with($path, '/deleteWebhook')) {
+                $body = '{"ok":true,"result":true}';
+            } elseif (str_ends_with($path, '/getWebhookInfo')) {
+                $body = '{"ok":true,"result":{"url":"https://example.com/telegram/webhook","pending_update_count":2}}';
+            } else {
+                $body = '{"ok":true,"result":{}}';
+            }
+
             return Create::promiseFor(new Response(200, [
                 'Content-Type' => 'application/json',
-            ], '{"ok":true,"result":{}}'));
+            ], $body));
         };
 
         return new TelegramMessenger(

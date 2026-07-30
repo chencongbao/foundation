@@ -70,7 +70,7 @@ class SendTelegramNotificationTest extends TestCase
             ->once()
             ->with([
                 'driver' => 'single',
-                'path' => '/tmp/logs/'.date('Y-m-d').'/foundation/telegram.log',
+                'path' => '/tmp/logs/'.date('Y-m-d').'/foundation/telegram_failure.log',
                 'level' => 'error',
             ])
             ->andReturn($logger);
@@ -87,12 +87,125 @@ class SendTelegramNotificationTest extends TestCase
             'timeout_seconds' => 3,
             'failure_log' => [
                 'driver' => 'single',
-                'path' => '/tmp/logs/{date}/foundation/telegram.log',
+                'path' => '/tmp/logs/{date}/foundation/telegram_failure.log',
                 'level' => 'error',
             ],
         ], $logs);
 
         $this->assertFalse($sender->send('failed message'));
+    }
+
+    public function test_it_writes_a_readable_success_log_without_the_message_body(): void
+    {
+        $logger = \Mockery::mock(LoggerInterface::class);
+        $logger->shouldReceive('info')
+            ->once()
+            ->with(\Mockery::on(static function (string $message): bool {
+                return str_contains($message, 'Telegram 操作日志')
+                    && str_contains($message, '应用名称：robots')
+                    && str_contains($message, '操作说明：Telegram 消息发送成功')
+                    && str_contains($message, '"chat_id": "-1001"')
+                    && str_contains($message, '"http_status": 200')
+                    && str_contains($message, '"telegram_message_id": 9527')
+                    && str_contains($message, '"message_bytes": 20')
+                    && str_contains($message, '"message_hash":')
+                    && str_contains($message, '"duration_ms":')
+                    && !str_contains($message, 'private message body');
+            }), []);
+
+        $logs = \Mockery::mock(LogManager::class);
+        $logs->shouldReceive('build')
+            ->once()
+            ->with([
+                'driver' => 'single',
+                'path' => '/tmp/logs/'.date('Y-m-d').'/foundation/telegram.log',
+                'level' => 'info',
+            ])
+            ->andReturn($logger);
+
+        $handler = static function (RequestInterface $_request, array $_options) {
+            return Create::promiseFor(new Response(200, [
+                'Content-Type' => 'application/json',
+            ], '{"ok":true,"result":{"message_id":9527}}'));
+        };
+        $sender = new TelegramNotificationSender(new Client(['handler' => $handler]), [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'application' => 'robots',
+            'activity_log' => [
+                'enabled' => true,
+                'driver' => 'single',
+                'path' => '/tmp/logs/{date}/foundation/telegram.log',
+                'level' => 'info',
+            ],
+        ], $logs);
+
+        $this->assertTrue($sender->send('private message body'));
+    }
+
+    public function test_bot_api_success_log_does_not_contain_webhook_secrets(): void
+    {
+        $logger = \Mockery::mock(LoggerInterface::class);
+        $logger->shouldReceive('info')
+            ->once()
+            ->with(\Mockery::on(static function (string $message): bool {
+                return str_contains($message, '操作说明：Telegram Bot API 调用成功')
+                    && str_contains($message, '"method": "setWebhook"')
+                    && str_contains($message, '"http_status": 200')
+                    && str_contains($message, '"result_type": "bool"')
+                    && !str_contains($message, 'webhook-secret')
+                    && !str_contains($message, 'private-hook-path');
+            }), []);
+
+        $logs = \Mockery::mock(LogManager::class);
+        $logs->shouldReceive('channel')->once()->with('stack')->andReturn($logger);
+
+        $handler = static function (RequestInterface $_request, array $_options) {
+            return Create::promiseFor(new Response(200, [
+                'Content-Type' => 'application/json',
+            ], '{"ok":true,"result":true}'));
+        };
+        $sender = new TelegramNotificationSender(new Client(['handler' => $handler]), [
+            'bot_token' => '123456:test-token',
+            'application' => 'robots',
+            'activity_log' => [
+                'enabled' => true,
+                'channel' => 'stack',
+                'path' => null,
+                'level' => 'info',
+            ],
+        ], $logs);
+
+        $this->assertTrue($sender->call('setWebhook', [
+            'url' => 'https://example.com/private-hook-path',
+            'secret_token' => 'webhook-secret',
+        ]));
+    }
+
+    public function test_success_operation_logs_can_be_disabled(): void
+    {
+        $logs = \Mockery::mock(LogManager::class);
+        $logs->shouldNotReceive('build');
+        $logs->shouldNotReceive('channel');
+
+        $handler = static function (RequestInterface $_request, array $_options) {
+            return Create::promiseFor(new Response(200, [
+                'Content-Type' => 'application/json',
+            ], '{"ok":true,"result":{"message_id":9527}}'));
+        };
+        $sender = new TelegramNotificationSender(new Client(['handler' => $handler]), [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'activity_log' => [
+                'enabled' => false,
+            ],
+        ], $logs);
+
+        $this->assertTrue($sender->send('message'));
     }
 
     public function test_failure_log_context_redacts_the_bot_token_and_sensitive_keys(): void

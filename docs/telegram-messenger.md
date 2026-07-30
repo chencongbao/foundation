@@ -14,7 +14,9 @@
 - 发送调用方构造的 Telegram HTML；
 - 发送带语言标签和复制按钮的代码块；
 - 发送自动格式化的 JSON，并组合应用名称和自定义标题；
-- 发送失败写入 `telegram.log`，Bot Token 自动脱敏。
+- 设置、删除和查询 Telegram Webhook；
+- 模块开启时成功操作写入 `telegram.log`，失败详情始终写入
+  `telegram_failure.log`，Bot Token 自动脱敏。
 
 ## 依赖注入
 
@@ -105,6 +107,46 @@ FoundationTelegram::withTitle('接口异常')
     ->sendJson($data);
 ```
 
+## Webhook 管理
+
+后台保存 Bot Token 时，可以继续通过 `withToken()` 按次覆盖：
+
+```php
+FoundationTelegram::withToken($botToken)->setWebhook(
+    'https://example.com/telegram/webhook',
+    [
+        'max_connections' => 20,
+        'allowed_updates' => [
+            'message',
+            'callback_query',
+        ],
+        'drop_pending_updates' => true,
+        'secret_token' => 'webhook_secret-123',
+    ]
+);
+```
+
+删除 Webhook：
+
+```php
+FoundationTelegram::withToken($botToken)->removeWebhook();
+
+// 同时清除 Telegram 当前等待投递的更新
+FoundationTelegram::withToken($botToken)->removeWebhook(true);
+```
+
+查询 Webhook 状态：
+
+```php
+$info = FoundationTelegram::withToken($botToken)->getWebhookInfo();
+```
+
+`setWebhook()` 支持 `ip_address`、`max_connections`、`allowed_updates`、
+`drop_pending_updates` 和 `secret_token`。当前不处理自签名证书文件上传。
+Webhook 管理为同步 API 调用；`modules.telegram` 开启时成功操作写入
+`telegram.log`，失败详情始终写入 `telegram_failure.log`。调用失败返回 `false`
+或空数组。操作日志不会记录 Webhook URL 或 `secret_token` 的值。
+
 ## 参数规则
 
 方法签名：
@@ -120,6 +162,9 @@ format(mixed $content, string $format = 'text', array $options = []): string
 sendText(string $text): bool
 sendHtml(string $html): bool
 sendJson(mixed $data): bool
+setWebhook(string $url, array $options = []): bool
+removeWebhook(bool $dropPendingUpdates = false): bool
+getWebhookInfo(): array
 ```
 
 - 不调用 `withToken()` 时使用 `FOUNDATION_TELEGRAM_BOT_TOKEN`；

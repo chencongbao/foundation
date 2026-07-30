@@ -36,10 +36,12 @@ storage/logs/2026-07-29/foundation/tron_rpc.log
 storage/logs/2026-07-29/foundation/client_ip.log
 storage/logs/2026-07-29/foundation/exception.log
 storage/logs/2026-07-29/foundation/telegram.log
+storage/logs/2026-07-29/foundation/telegram_failure.log
 ```
 
-前两个是受模块开关控制的普通日志。`exception.log` 是异常专用日志，
-`telegram.log` 是 Telegram 发送失败日志；后两个始终写入，不受
+`tron_rpc`、`client_ip` 和 Telegram 成功操作是受模块开关控制的普通日志。
+`exception.log` 是异常专用日志；Telegram 失败详情单独写入
+`telegram_failure.log`，并保持之前的强制记录逻辑。异常日志和 Telegram 失败日志始终写入，不受
 `FOUNDATION_LOG_ENABLED` 或任意模块 `enabled` 开关影响。
 
 独立开关和路径：
@@ -52,9 +54,15 @@ FOUNDATION_LOG_TRON_RPC_PATH=/绝对路径/logs/{date}/foundation/tron_rpc.log
 FOUNDATION_LOG_CLIENT_IP_ENABLED=false
 FOUNDATION_LOG_CLIENT_IP_LEVEL=info
 FOUNDATION_LOG_CLIENT_IP_PATH=/绝对路径/logs/{date}/foundation/client_ip.log
+
+FOUNDATION_LOG_TELEGRAM_ENABLED=false
+FOUNDATION_LOG_TELEGRAM_LEVEL=info
+FOUNDATION_LOG_TELEGRAM_PATH=/绝对路径/logs/{date}/foundation/telegram.log
 ```
 
 模块日志默认关闭，需要哪个模块就显式设置对应的 `FOUNDATION_LOG_*_ENABLED=true`。
+关闭 `FOUNDATION_LOG_TELEGRAM_ENABLED` 只停止成功发送、Webhook 成功和队列投递
+日志，Telegram 失败日志仍然强制写入。
 
 `TronRpcClient` 会自动记录请求开始、节点响应、成功、节点故障及最终异常。
 `TrustedProxyClientIpResolver` 会自动记录最终解析出的 IP、来源、域名和入口节点。
@@ -65,7 +73,7 @@ FOUNDATION_LOG_CLIENT_IP_PATH=/绝对路径/logs/{date}/foundation/client_ip.log
 
 ## 统一可读格式
 
-Foundation 产生的普通模块日志、异常日志和 Telegram 失败日志都使用多行分区格式。
+Foundation 产生的普通模块日志、异常日志和 Telegram 操作日志都使用多行分区格式。
 普通模块日志示例：
 
 ```text
@@ -422,17 +430,46 @@ php artisan queue:restart
 发送失败时 Job 会抛出异常，由 Laravel Queue 按 `TRIES` 和 `BACKOFF` 配置重试。
 Job 只序列化通知文本，不会把 Telegram Bot Token 和 Chat ID 写入队列 Payload。
 
-每次 Telegram API 返回失败、发生网络异常、队列任务发送失败或任务无法投递到队列时，
-Foundation 都会写入：
+Foundation 将正常和失败链路分别写入：
 
 ```text
 storage/logs/YYYY-MM-DD/foundation/telegram.log
+storage/logs/YYYY-MM-DD/foundation/telegram_failure.log
 ```
 
-日志包含 Chat ID、HTTP 状态、Telegram `error_code` 和 `description`、异常类、
-异常位置、当前重试次数、队列和连接名称。通知正文只记录 SHA-256 指纹，不写入原文；
-Bot Token、Authorization 和 Secret 会脱敏。失败日志不受普通日志开关影响，日志写入
-自身发生故障时也不会阻断业务或队列重试。
+`telegram.log` 记录：
+
+- 消息发送成功：Chat ID、HTTP 状态、Telegram 消息 ID、耗时、正文长度和 SHA-256；
+- Webhook 操作成功：API 方法、HTTP 状态、耗时、结果类型和结果字段；
+- 异步任务投递成功：队列、连接、重试次数、超时和消息 SHA-256。
+
+`telegram_failure.log` 记录：
+
+- API 或网络失败：错误码、错误说明、异常类型、位置和请求耗时；
+- 队列任务发送失败或无法投递：当前重试次数、队列和连接信息。
+
+通知正文、Webhook URL 和 API 参数值不会写入操作日志，只记录必要的摘要和字段名称。
+Bot Token、Authorization 和 Secret 会递归脱敏。失败日志不受任何普通日志开关影响，
+日志系统自身发生故障时也不会阻断业务、Telegram API 调用或队列重试。
+
+Telegram 成功操作日志示例：
+
+```text
+==================== Telegram 操作日志 ====================
+发生时间：2026-07-30 16:12:28
+应用名称：robots
+操作说明：Telegram 消息发送成功
+------------------------- 上下文 -------------------------
+{
+    "chat_id": "-1001234567890",
+    "http_status": 200,
+    "duration_ms": 182.35,
+    "telegram_message_id": 9527,
+    "message_bytes": 860,
+    "message_hash": "..."
+}
+============================================================
+```
 
 Telegram 失败日志同样使用多行格式：
 
@@ -451,14 +488,37 @@ Telegram 失败日志同样使用多行格式：
 ============================================================
 ```
 
-如需修改失败日志路径，在 `config/foundation_custom.php` 中覆盖：
+Telegram 正常操作日志属于 `modules.telegram`，通过模块环境变量开启：
+
+```dotenv
+FOUNDATION_LOG_TELEGRAM_ENABLED=true
+```
+
+项目也可以在 `config/foundation_custom.php` 中覆盖正常日志模块：
+
+```php
+return [
+    'foundation_log' => [
+        'modules' => [
+            'telegram' => [
+                'enabled' => true,
+                'path' => storage_path('logs/{date}/foundation/telegram.log'),
+                'level' => 'info',
+            ],
+        ],
+    ],
+];
+```
+
+失败日志保持原来的独立配置：
 
 ```php
 return [
     'foundation_log' => [
         'telegram' => [
             'failure_log' => [
-                'path' => storage_path('logs/{date}/foundation/telegram.log'),
+                'path' => storage_path('logs/{date}/foundation/telegram_failure.log'),
+                'level' => 'error',
             ],
         ],
     ],
