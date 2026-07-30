@@ -49,6 +49,7 @@ return [
         'timeout_seconds' => max(0.5, (float) env('FOUNDATION_TELEGRAM_TIMEOUT', 3)),
         'environment' => (string) env('APP_ENV', 'production'),
         'application' => (string) env('APP_NAME', 'Laravel'),
+        'exception_title' => 'TRON 异常',
         // 发送失败始终写入独立日志，不受 FOUNDATION_LOG_ENABLED 影响。
         'failure_log' => [
             'driver' => 'single',

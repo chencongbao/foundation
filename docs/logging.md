@@ -192,19 +192,16 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 任何一项不满足都不会发送。Telegram 请求失败只返回失败状态，不抛出异常，不影响原
 业务。
 
-异常通知保留原有内容和中文字段，正文使用格式化 JSON：
+异常通知在 Telegram 中显示粗体标题和带复制按钮的 JSON 代码块。JSON 使用英文键名：
 
 ```json
 {
-    "标题": "[tronweb4] Foundation 异常通知",
-    "运行环境": "production",
-    "功能模块": "tron_exception",
-    "异常类型": "App\\Exceptions\\TronProviderFailoverException",
-    "异常消息": "TRON fullnode primary provider switched to provider #2.",
-    "错误代码": 0,
-    "发生时间": "2026-07-30T15:15:37+08:00",
-    "上下文": {
-        "node": "tronweb4",
+    "node": "tronweb4",
+    "exception": "App\\Exceptions\\TronProviderFailoverException",
+    "message": "TRON fullnode primary provider switched to provider #2.",
+    "file": "app/Services/Tron/TronProviderService.php",
+    "line": 312,
+    "context": {
         "error": "TRON 主节点已切换到备用节点",
         "pool": "fullnode",
         "backup_provider": "provider #2"
@@ -212,9 +209,10 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 }
 ```
 
-标题中的应用名称来自 `APP_NAME`，传入的 Context 保持原结构，不会移动或改名。超过
-Telegram 长度限制时，过长的上下文会替换为 `truncated` 标记和 SHA-256 指纹，确保
-发送的正文始终是完整、可解析的 JSON。
+标题默认为 `TRON 异常`。`context.node` 会提升到顶层 `node`，没有传入时使用
+`APP_NAME`；异常文件尽量转换为宿主项目相对路径。超过 Telegram 长度限制时，过长的
+Context 会替换为 `truncated` 标记和 SHA-256 指纹，确保代码块中的正文始终是完整、
+可解析的 JSON。
 
 ## 相同异常去重
 

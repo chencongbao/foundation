@@ -47,6 +47,7 @@ final class TelegramNotificationSender
                 $params = [
                     'chat_id' => (string) $chatId,
                     'text' => $message,
+                    'parse_mode' => 'HTML',
                     'disable_web_page_preview' => true,
                 ];
 

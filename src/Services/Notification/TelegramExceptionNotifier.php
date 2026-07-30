@@ -40,7 +40,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             return true;
         }
 
-        $sent = $this->send($this->exceptionMessage($module, $exception, $context));
+        $sent = $this->send($this->exceptionMessage($exception, $context));
         if (!$sent && is_string($cacheKey)) {
             try {
                 $this->cache?->forget($cacheKey);
@@ -164,40 +164,47 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         }
     }
 
-    private function exceptionMessage(string $module, Throwable $exception, array $context): string
+    private function exceptionMessage(Throwable $exception, array $context): string
     {
-        $application = (string) ($this->config['application'] ?? 'Laravel');
+        $node = trim((string) ($context['node'] ?? $this->config['application'] ?? 'Laravel'));
+        unset($context['node']);
+
         $payload = [
-            '标题' => '['.$application.'] Foundation 异常通知',
-            '运行环境' => (string) ($this->config['environment'] ?? '未知'),
-            '功能模块' => $module,
-            '异常类型' => get_class($exception),
-            '异常消息' => $exception->getMessage(),
-            '错误代码' => $exception->getCode(),
-            '发生时间' => date(DATE_ATOM),
-            '上下文' => $context,
+            'node' => $node,
+            'exception' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'file' => $this->relativePath($exception->getFile()),
+            'line' => $exception->getLine(),
+            'context' => $context,
         ];
 
         $json = $this->encodeMessage($payload);
-        if (strlen($json) <= 3900) {
-            return $json;
+        $message = $this->formatMessage($json);
+        if (strlen($message) <= 3900) {
+            return $message;
         }
 
         $contextJson = json_encode(
             $context,
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
         );
-        $payload['标题'] = $this->truncateText('['.$application.'] Foundation 异常通知', 256);
-        $payload['运行环境'] = $this->truncateText((string) ($this->config['environment'] ?? '未知'), 128);
-        $payload['功能模块'] = $this->truncateText($module, 128);
-        $payload['异常类型'] = $this->truncateText(get_class($exception), 256);
-        $payload['异常消息'] = $this->truncateText($exception->getMessage(), 1000);
-        $payload['上下文'] = [
+        $payload['node'] = $this->truncateText($node, 128);
+        $payload['exception'] = $this->truncateText(get_class($exception), 256);
+        $payload['message'] = $this->truncateText($exception->getMessage(), 500);
+        $payload['file'] = $this->truncateText($this->relativePath($exception->getFile()), 384);
+        $payload['context'] = [
             'truncated' => true,
             'sha256' => hash('sha256', $contextJson === false ? serialize($context) : $contextJson),
         ];
+        $message = $this->formatMessage($this->encodeMessage($payload));
+        if (strlen($message) <= 3900) {
+            return $message;
+        }
 
-        return $this->encodeMessage($payload);
+        $payload['message'] = '[truncated sha256:'.hash('sha256', $exception->getMessage()).']';
+        $payload['file'] = $this->truncateText((string) $payload['file'], 128);
+
+        return $this->formatMessage($this->encodeMessage($payload));
     }
 
     private function encodeMessage(array $payload): string
@@ -212,6 +219,40 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         );
 
         return $json === false ? '{}' : $json;
+    }
+
+    private function formatMessage(string $json): string
+    {
+        $title = $this->truncateText(
+            trim((string) ($this->config['exception_title'] ?? 'TRON 异常')),
+            128
+        );
+
+        return '<b>'.htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</b>'
+            ."\n"
+            .'<pre><code class="language-json">'
+            .htmlspecialchars($json, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            .'</code></pre>';
+    }
+
+    private function relativePath(string $file): string
+    {
+        $file = str_replace('\\', '/', $file);
+        if (!function_exists('app')) {
+            return $file;
+        }
+
+        try {
+            $application = app();
+            if (!is_object($application) || !method_exists($application, 'basePath')) {
+                return $file;
+            }
+            $basePath = rtrim(str_replace('\\', '/', (string) $application->basePath()), '/').'/';
+        } catch (Throwable) {
+            return $file;
+        }
+
+        return str_starts_with($file, $basePath) ? substr($file, strlen($basePath)) : $file;
     }
 
     private function truncateText(string $value, int $maxBytes): string
