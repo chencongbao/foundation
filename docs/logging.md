@@ -252,13 +252,13 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 
 ```json
 {
-    "node": "tronweb4",
     "exception": "App\\Exceptions\\TronProviderFailoverException",
     "message": "TRON fullnode primary provider switched to provider #2.",
     "file": "app/Services/Tron/TronProviderService.php",
     "line": 312,
     "time": "2026-07-30 15:15:37",
     "context": {
+        "node": "tronweb4",
         "error": "TRON 主节点已切换到备用节点",
         "pool": "fullnode",
         "backup_provider": "provider #2"
@@ -266,22 +266,23 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 }
 ```
 
-标题默认使用 `[节点名称] 系统异常`，例如 `[sg_robots] 系统异常`。`context.node`
-会提升到顶层 `node`，没有传入时使用 `APP_NAME`；异常文件尽量转换为宿主项目相对
-路径。超过 Telegram 长度限制时，过长的 Context 会替换为 `truncated` 标记和
-SHA-256 指纹，确保代码块中的正文始终是完整、可解析的 JSON。
+标题默认使用 `[应用名称] 系统异常`，应用名称来自
+`foundation_log.telegram.application`，默认读取 `APP_NAME`。`node` 不参与标题，
+并原样保留在 `context` 内；异常文件尽量转换为宿主项目相对路径。超过 Telegram
+长度限制时，过长的 Context 会替换为 `truncated` 标记和 SHA-256 指纹；如果原始
+Context 包含 `node`，截断后仍会保留该字段，确保正文始终是完整、可解析的 JSON。
 
 `time` 固定使用 `Asia/Shanghai` 北京时间，格式为 `Y-m-d H:i:s`，不受服务器默认
 时区影响。
 
-项目如需固定或自定义标题，可在 `config/foundation_custom.php` 中覆盖，`{node}` 会
-替换成当前节点名称：
+项目如需固定或自定义标题，可在 `config/foundation_custom.php` 中覆盖，
+`{application}` 会替换成 `foundation_log.telegram.application`：
 
 ```php
 return [
     'foundation_log' => [
         'telegram' => [
-            'exception_title' => '[{node}] 异常告警',
+            'exception_title' => '[{application}] 异常告警',
         ],
     ],
 ];

@@ -168,11 +168,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
 
     private function exceptionMessage(Throwable $exception, array $context): string
     {
-        $node = trim((string) ($context['node'] ?? $this->config['application'] ?? 'Laravel'));
-        unset($context['node']);
-
         $payload = [
-            'node' => $node,
             'exception' => get_class($exception),
             'message' => $exception->getMessage(),
             'file' => $this->relativePath($exception->getFile()),
@@ -183,7 +179,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         ];
 
         $json = $this->encodeMessage($payload);
-        $message = $this->formatMessage($json, $node);
+        $message = $this->formatMessage($json);
         if (strlen($message) <= 3900) {
             return $message;
         }
@@ -192,7 +188,6 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             $context,
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
         );
-        $payload['node'] = $this->truncateText($node, 128);
         $payload['exception'] = $this->truncateText(get_class($exception), 256);
         $payload['message'] = $this->truncateText($exception->getMessage(), 500);
         $payload['file'] = $this->truncateText($this->relativePath($exception->getFile()), 384);
@@ -200,7 +195,12 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             'truncated' => true,
             'sha256' => hash('sha256', $contextJson === false ? serialize($context) : $contextJson),
         ];
-        $message = $this->formatMessage($this->encodeMessage($payload), (string) $payload['node']);
+        if (isset($context['node'])) {
+            $payload['context'] = [
+                'node' => $this->truncateText((string) $context['node'], 128),
+            ] + $payload['context'];
+        }
+        $message = $this->formatMessage($this->encodeMessage($payload));
         if (strlen($message) <= 3900) {
             return $message;
         }
@@ -208,7 +208,7 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         $payload['message'] = '[truncated sha256:'.hash('sha256', $exception->getMessage()).']';
         $payload['file'] = $this->truncateText((string) $payload['file'], 128);
 
-        return $this->formatMessage($this->encodeMessage($payload), (string) $payload['node']);
+        return $this->formatMessage($this->encodeMessage($payload));
     }
 
     private function encodeMessage(array $payload): string
@@ -225,12 +225,14 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
         return $json === false ? '{}' : $json;
     }
 
-    private function formatMessage(string $json, string $node): string
+    private function formatMessage(string $json): string
     {
+        $application = trim((string) ($this->config['application'] ?? 'Laravel'));
+        $application = $application === '' ? 'Laravel' : $application;
         $configuredTitle = trim((string) ($this->config['exception_title'] ?? ''));
         $title = $configuredTitle === ''
-            ? '['.$node.'] 系统异常'
-            : str_replace('{node}', $node, $configuredTitle);
+            ? '['.$application.'] 系统异常'
+            : str_replace('{application}', $application, $configuredTitle);
         $title = $this->truncateText($title, 128);
 
         return '<b>'.htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</b>'

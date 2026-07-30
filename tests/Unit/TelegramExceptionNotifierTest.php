@@ -60,7 +60,7 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertSame('HTML', $requests[0]['params']['parse_mode']);
         $this->assertStringStartsWith('<b>[Robots] 系统异常</b>', $requests[0]['params']['text']);
         $message = $this->decodeNotification($requests[0]['params']['text']);
-        $this->assertSame('Robots', $message['node']);
+        $this->assertArrayNotHasKey('node', $message);
         $this->assertSame(RuntimeException::class, $message['exception']);
         $this->assertSame('RPC failed', $message['message']);
         $this->assertIsString($message['file']);
@@ -74,7 +74,7 @@ class TelegramExceptionNotifierTest extends TestCase
         ], $message['context']);
     }
 
-    public function test_it_moves_node_to_the_json_root_and_keeps_the_remaining_context(): void
+    public function test_it_keeps_node_in_context_and_uses_the_application_in_the_title(): void
     {
         $requests = [];
         $config = [
@@ -94,9 +94,9 @@ class TelegramExceptionNotifierTest extends TestCase
         ]));
 
         $message = $this->decodeNotification($requests[0]['params']['text']);
-        $this->assertStringStartsWith('<b>[tronweb4] 系统异常</b>', $requests[0]['params']['text']);
-        $this->assertSame('tronweb4', $message['node']);
-        $this->assertArrayNotHasKey('node', $message['context']);
+        $this->assertStringStartsWith('<b>[FallbackNode] 系统异常</b>', $requests[0]['params']['text']);
+        $this->assertArrayNotHasKey('node', $message);
+        $this->assertSame('tronweb4', $message['context']['node']);
         $this->assertSame('fullnode', $message['context']['pool']);
         $this->assertSame('provider #2', $message['context']['backup_provider']);
     }
@@ -122,11 +122,12 @@ class TelegramExceptionNotifierTest extends TestCase
         $text = $requests[0]['params']['text'];
         $message = $this->decodeNotification($text);
         $this->assertLessThanOrEqual(3900, strlen($text));
+        $this->assertSame('tronweb4', $message['context']['node']);
         $this->assertTrue($message['context']['truncated']);
         $this->assertSame(64, strlen($message['context']['sha256']));
     }
 
-    public function test_it_supports_a_custom_title_with_the_node_placeholder(): void
+    public function test_it_supports_a_custom_title_with_the_application_placeholder(): void
     {
         $requests = [];
         $config = [
@@ -135,7 +136,7 @@ class TelegramExceptionNotifierTest extends TestCase
             'chat_ids' => ['-1001'],
             'timeout_seconds' => 3,
             'application' => 'robots',
-            'exception_title' => '{node} 异常告警',
+            'exception_title' => '{application} 异常告警',
             'queue' => ['enabled' => false],
         ];
         $notifier = $this->notifier($requests, $config);
@@ -144,7 +145,7 @@ class TelegramExceptionNotifierTest extends TestCase
             'node' => 'sg_robots',
         ]));
         $this->assertStringStartsWith(
-            '<b>sg_robots 异常告警</b>',
+            '<b>robots 异常告警</b>',
             $requests[0]['params']['text']
         );
     }
