@@ -55,7 +55,12 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertCount(2, $requests);
         $this->assertStringContainsString('/bot123456:test-token/sendMessage', $requests[0]['uri']);
         $this->assertSame('-1001', $requests[0]['params']['chat_id']);
-        $this->assertStringContainsString('Module: tron_rpc', $requests[0]['params']['text']);
+        $this->assertStringContainsString('Foundation 异常通知', $requests[0]['params']['text']);
+        $this->assertStringContainsString('运行环境：production', $requests[0]['params']['text']);
+        $this->assertStringContainsString('功能模块：tron_rpc', $requests[0]['params']['text']);
+        $this->assertStringContainsString('异常类型：'.RuntimeException::class, $requests[0]['params']['text']);
+        $this->assertStringContainsString('异常消息：RPC failed', $requests[0]['params']['text']);
+        $this->assertStringContainsString('上下文：', $requests[0]['params']['text']);
     }
 
     public function test_it_dispatches_telegram_notifications_to_the_configured_queue(): void

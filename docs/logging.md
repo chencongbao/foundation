@@ -156,6 +156,21 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 任何一项不满足都不会发送。Telegram 请求失败只返回失败状态，不抛出异常，不影响原
 业务。
 
+异常通知模板使用中文字段名：
+
+```text
+[应用名称] Foundation 异常通知
+运行环境：production
+功能模块：tron_rpc
+异常类型：RuntimeException
+异常消息：RPC 请求失败
+错误代码：0
+发生时间：2026-07-30T09:00:00+08:00
+上下文：{"node":"tronweb1"}
+```
+
+异常类名、模块名、原始异常消息和上下文数据不会翻译，确保诊断信息保持准确。
+
 ## 相同异常去重
 
 Telegram 异常默认去重 300 秒。同一模块、异常类和异常消息生成同一个 SHA-256

@@ -158,17 +158,17 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
     private function exceptionMessage(string $module, Throwable $exception, array $context): string
     {
         $lines = [
-            '['.(string) ($this->config['application'] ?? 'Laravel').'] Foundation exception',
-            'Environment: '.(string) ($this->config['environment'] ?? 'unknown'),
-            'Module: '.$module,
-            'Exception: '.get_class($exception),
-            'Message: '.$exception->getMessage(),
-            'Code: '.(string) $exception->getCode(),
-            'Time: '.date(DATE_ATOM),
+            '['.(string) ($this->config['application'] ?? 'Laravel').'] Foundation 异常通知',
+            '运行环境：'.(string) ($this->config['environment'] ?? '未知'),
+            '功能模块：'.$module,
+            '异常类型：'.get_class($exception),
+            '异常消息：'.$exception->getMessage(),
+            '错误代码：'.(string) $exception->getCode(),
+            '发生时间：'.date(DATE_ATOM),
         ];
         if ($context !== []) {
             $json = json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-            $lines[] = 'Context: '.($json === false ? '{}' : $json);
+            $lines[] = '上下文：'.($json === false ? '{}' : $json);
         }
 
         return substr(implode("\n", $lines), 0, 3900);
