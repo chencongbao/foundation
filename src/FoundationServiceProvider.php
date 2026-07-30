@@ -5,6 +5,7 @@ namespace Chencongbao\Foundation;
 use GuzzleHttp\Client;
 use Illuminate\Log\LogManager;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\ServiceProvider;
 use Chencongbao\Foundation\Services\Tron\TronRpcClient;
 use Chencongbao\Foundation\Contracts\ClientIpResolver;
@@ -44,7 +45,8 @@ class FoundationServiceProvider extends ServiceProvider
         $this->app->singleton(TelegramExceptionNotifier::class, static fn ($app): TelegramExceptionNotifier => new TelegramExceptionNotifier(
             $app->make(TelegramNotificationSender::class),
             $app->make(Dispatcher::class),
-            (array) $app['config']->get('foundation_log.telegram', [])
+            (array) $app['config']->get('foundation_log.telegram', []),
+            $app->make(CacheRepository::class)
         ));
         $this->app->singleton(
             ExceptionNotifier::class,

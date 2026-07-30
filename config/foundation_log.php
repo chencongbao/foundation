@@ -40,6 +40,12 @@ return [
         'timeout_seconds' => max(0.5, (float) env('FOUNDATION_TELEGRAM_TIMEOUT', 3)),
         'environment' => (string) env('APP_ENV', 'production'),
         'application' => (string) env('APP_NAME', 'Laravel'),
+        // 相同模块、异常类和异常内容在此时间内只通知一次；设为 0 可关闭去重。
+        'deduplicate_seconds' => 300,
+        // 项目可在 foundation_custom.php 中指定参与指纹的 Context 点号路径。
+        'deduplicate_context_keys' => [],
+        // 项目可配置必须每次通知、不参与去重的异常类。
+        'deduplicate_exclude_exceptions' => [],
         'queue' => [
             'enabled' => (bool) env('FOUNDATION_TELEGRAM_QUEUE_ENABLED', true),
             // 留空时跟随宿主项目 queue.default（即 QUEUE_CONNECTION）。

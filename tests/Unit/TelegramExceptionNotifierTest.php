@@ -10,6 +10,7 @@ use GuzzleHttp\Promise\Create;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Chencongbao\Foundation\Jobs\SendTelegramNotification;
 use Chencongbao\Foundation\Services\Notification\TelegramExceptionNotifier;
@@ -123,6 +124,152 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertSame([], $requests);
     }
 
+    public function test_it_only_sends_the_same_exception_once_during_the_deduplication_window(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'deduplicate_seconds' => 300,
+            'queue' => ['enabled' => false],
+        ];
+        $cache = Mockery::mock(CacheRepository::class);
+        $cache->shouldReceive('add')
+            ->twice()
+            ->with(
+                Mockery::on(static fn ($key): bool => str_starts_with(
+                    (string) $key,
+                    'foundation:telegram:exception:'
+                )),
+                true,
+                300
+            )
+            ->andReturn(true, false);
+        $notifier = new TelegramExceptionNotifier(
+            new TelegramNotificationSender($this->client($requests), $config),
+            Mockery::mock(Dispatcher::class),
+            $config,
+            $cache
+        );
+
+        $this->assertTrue($notifier->notify(
+            'tron_rpc',
+            new RuntimeException('RPC unavailable'),
+            ['endpoint' => 'node-1']
+        ));
+        $this->assertTrue($notifier->notify(
+            'tron_rpc',
+            new RuntimeException('RPC unavailable'),
+            ['endpoint' => 'node-2']
+        ));
+        $this->assertCount(1, $requests);
+    }
+
+    public function test_it_does_not_merge_exceptions_with_different_messages(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'deduplicate_seconds' => 300,
+            'queue' => ['enabled' => false],
+        ];
+        $cache = Mockery::mock(CacheRepository::class);
+        $cache->shouldReceive('add')->twice()->andReturn(true);
+        $notifier = new TelegramExceptionNotifier(
+            new TelegramNotificationSender($this->client($requests), $config),
+            Mockery::mock(Dispatcher::class),
+            $config,
+            $cache
+        );
+
+        $this->assertTrue($notifier->notify('tron_rpc', new RuntimeException('node-1 failed')));
+        $this->assertTrue($notifier->notify('tron_rpc', new RuntimeException('node-2 failed')));
+        $this->assertCount(2, $requests);
+    }
+
+    public function test_configured_context_keys_can_separate_otherwise_identical_exceptions(): void
+    {
+        $requests = [];
+        $cacheKeys = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'deduplicate_seconds' => 300,
+            'deduplicate_context_keys' => ['node'],
+            'queue' => ['enabled' => false],
+        ];
+        $cache = Mockery::mock(CacheRepository::class);
+        $cache->shouldReceive('add')
+            ->twice()
+            ->andReturnUsing(static function ($key, $value, $ttl) use (&$cacheKeys): bool {
+                $cacheKeys[] = $key;
+
+                return true;
+            });
+        $notifier = new TelegramExceptionNotifier(
+            new TelegramNotificationSender($this->client($requests), $config),
+            Mockery::mock(Dispatcher::class),
+            $config,
+            $cache
+        );
+
+        $exceptionMessage = 'TRON fullnode primary provider switched to provider #2.';
+        $this->assertTrue($notifier->notify(
+            'tron_rpc',
+            new RuntimeException($exceptionMessage),
+            ['node' => 'tronweb1']
+        ));
+        $this->assertTrue($notifier->notify(
+            'tron_rpc',
+            new RuntimeException($exceptionMessage),
+            ['node' => 'tronweb2']
+        ));
+
+        $this->assertCount(2, $requests);
+        $this->assertNotSame($cacheKeys[0], $cacheKeys[1]);
+    }
+
+    public function test_excluded_exception_classes_are_sent_every_time_without_using_the_cache(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'deduplicate_seconds' => 300,
+            'deduplicate_exclude_exceptions' => [
+                CriticalNotificationException::class,
+            ],
+            'queue' => ['enabled' => false],
+        ];
+        $cache = Mockery::mock(CacheRepository::class);
+        $cache->shouldNotReceive('add');
+        $notifier = new TelegramExceptionNotifier(
+            new TelegramNotificationSender($this->client($requests), $config),
+            Mockery::mock(Dispatcher::class),
+            $config,
+            $cache
+        );
+
+        $this->assertTrue($notifier->notify(
+            'tron_rpc',
+            new CriticalNotificationException('all providers unavailable')
+        ));
+        $this->assertTrue($notifier->notify(
+            'tron_rpc',
+            new CriticalNotificationException('all providers unavailable')
+        ));
+        $this->assertCount(2, $requests);
+    }
+
     private function notifier(array &$requests, array $config): TelegramExceptionNotifier
     {
         return new TelegramExceptionNotifier(
@@ -148,4 +295,8 @@ class TelegramExceptionNotifierTest extends TestCase
 
         return new Client(['handler' => $handler]);
     }
+}
+
+class CriticalNotificationException extends RuntimeException
+{
 }

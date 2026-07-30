@@ -155,6 +155,88 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 任何一项不满足都不会发送。Telegram 请求失败只返回失败状态，不抛出异常，不影响原
 业务。
 
+## 相同异常去重
+
+Telegram 异常默认去重 300 秒。同一模块、异常类和异常消息生成同一个 SHA-256
+指纹，5 分钟内只发送第一次：
+
+```text
+模块 + 异常类 + 异常消息
+```
+
+Context、异常文件和行号不参与指纹。本地日志不受去重影响，每次异常仍会完整记录。
+去重使用 Laravel 默认 Cache；多台服务器需要使用 Redis 等共享缓存，才能实现跨服务器
+去重。缓存不可用时会跳过去重并继续通知，不影响原业务。
+
+如需调整时间，在 `config/foundation_custom.php` 中覆盖：
+
+```php
+return [
+    'foundation_log' => [
+        'telegram' => [
+            'deduplicate_seconds' => 600,
+        ],
+    ],
+];
+```
+
+设为 `0` 可以关闭异常去重。
+
+项目可以指定额外参与指纹的 Context 字段。例如相同 TRON 异常需要按照节点分别通知：
+
+```php
+return [
+    'foundation_log' => [
+        'telegram' => [
+            'deduplicate_context_keys' => [
+                'node',
+            ],
+        ],
+    ],
+];
+```
+
+项目调用时必须把字段传入 `exception()` 的 Context：
+
+```php
+FoundationLog::exception('tron_rpc', $exception, [
+    'node' => $node,
+    'pool' => 'fullnode',
+]);
+```
+
+此时 `tronweb1` 和 `tronweb2` 会分别通知；同一个节点的相同异常在 5 分钟内仍只通知
+一次。字段名完全由项目配置，Foundation 不依赖 `node` 等业务含义。支持点号路径：
+
+```php
+'deduplicate_context_keys' => [
+    'server.node',
+    'provider.pool',
+],
+```
+
+默认值为空数组，因此未配置该功能的项目仍只使用模块、异常类和异常消息生成指纹。
+
+必须每次通知的异常可以加入去重排除名单。异常类由项目定义，Foundation 只按类名
+判断，不依赖项目业务：
+
+```php
+return [
+    'foundation_log' => [
+        'telegram' => [
+            'deduplicate_exclude_exceptions' => [
+                \App\Exceptions\CriticalTronException::class,
+                \App\Exceptions\SecurityAlertException::class,
+            ],
+        ],
+    ],
+];
+```
+
+命中名单的异常完全跳过缓存去重，每次都会投递通知。使用 `is_a()` 判断，因此配置父类
+时其子类也会命中。建议为必须实时通知的情况建立明确的自定义异常类，不要直接排除
+`RuntimeException` 等使用范围很大的基础异常。
+
 ## Telegram 异步队列
 
 Telegram 通知默认通过 Laravel Queue 异步投递。业务请求只负责写本地日志和提交

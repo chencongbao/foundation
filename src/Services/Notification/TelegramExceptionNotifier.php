@@ -3,7 +3,9 @@
 namespace Chencongbao\Foundation\Services\Notification;
 
 use Throwable;
+use Illuminate\Support\Arr;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
 use Chencongbao\Foundation\Jobs\SendTelegramNotification;
 
@@ -12,21 +14,113 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
     private TelegramNotificationSender $sender;
     private Dispatcher $dispatcher;
     private array $config;
+    private ?CacheRepository $cache;
 
     public function __construct(
         TelegramNotificationSender $sender,
         Dispatcher $dispatcher,
-        array $config
+        array $config,
+        ?CacheRepository $cache = null
     )
     {
         $this->sender = $sender;
         $this->dispatcher = $dispatcher;
         $this->config = $config;
+        $this->cache = $cache;
     }
 
     public function notify(string $module, Throwable $exception, array $context = []): bool
     {
-        return $this->send($this->exceptionMessage($module, $exception, $context));
+        if (!$this->sender->configured()) {
+            return false;
+        }
+
+        $cacheKey = $this->reserveException($module, $exception, $context);
+        if ($cacheKey === false) {
+            return true;
+        }
+
+        $sent = $this->send($this->exceptionMessage($module, $exception, $context));
+        if (!$sent && is_string($cacheKey)) {
+            try {
+                $this->cache?->forget($cacheKey);
+            } catch (Throwable) {
+                // 缓存异常不能影响业务异常处理流程。
+            }
+        }
+
+        return $sent;
+    }
+
+    /**
+     * @return string|false|null 缓存键、重复异常、未启用或缓存不可用
+     */
+    private function reserveException(string $module, Throwable $exception, array $context)
+    {
+        if ($this->deduplicationExcluded($exception)) {
+            return null;
+        }
+
+        $seconds = max(0, (int) ($this->config['deduplicate_seconds'] ?? 300));
+        if ($seconds === 0 || $this->cache === null) {
+            return null;
+        }
+
+        $fingerprintParts = [
+            $module,
+            get_class($exception),
+            $exception->getMessage(),
+        ];
+        $contextFingerprint = $this->contextFingerprint($context);
+        if ($contextFingerprint !== null) {
+            $fingerprintParts[] = $contextFingerprint;
+        }
+
+        $fingerprint = hash('sha256', implode("\0", $fingerprintParts));
+        $cacheKey = 'foundation:telegram:exception:'.$fingerprint;
+
+        try {
+            return $this->cache->add($cacheKey, true, $seconds) ? $cacheKey : false;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function deduplicationExcluded(Throwable $exception): bool
+    {
+        foreach ((array) ($this->config['deduplicate_exclude_exceptions'] ?? []) as $class) {
+            $class = trim((string) $class);
+            if ($class !== '' && is_a($exception, $class)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function contextFingerprint(array $context): ?string
+    {
+        $values = [];
+        foreach ((array) ($this->config['deduplicate_context_keys'] ?? []) as $key) {
+            $key = trim((string) $key);
+            if ($key === '') {
+                continue;
+            }
+
+            $values[$key] = Arr::has($context, $key)
+                ? Arr::get($context, $key)
+                : ['__foundation_missing__' => true];
+        }
+        if ($values === []) {
+            return null;
+        }
+
+        $encoded = json_encode(
+            $values,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR
+        );
+
+        return $encoded === false ? serialize($values) : $encoded;
     }
 
     private function send(string $message): bool
