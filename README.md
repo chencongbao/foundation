@@ -67,6 +67,10 @@ Foundation 的 Telegram 异常通知默认投递到 Laravel Queue。生产环境
 纯文本、HTML、格式化 JSON 或带复制按钮的代码块。详细用法见
 [自定义 Telegram 消息](docs/telegram-messenger.md)。
 
+Telegram Webhook 的 JSON 解析、Secret Token 校验、`update_id` 去重和统一异常回调，
+使用 `FoundationTelegramWebhook`。宿主项目只保留命令、权限和消息业务，详见
+[Telegram Webhook 处理](docs/telegram-webhook.md)。
+
 ## TRON 基础工具
 
 不需要调用节点的地址校验、地址格式转换和数量换算使用 `Support\Tron`：

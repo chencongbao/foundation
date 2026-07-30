@@ -41,6 +41,7 @@
             ],
             "aliases": {
                 "FoundationTelegram": "Chencongbao\\Foundation\\Facades\\FoundationTelegram",
+                "FoundationTelegramWebhook": "Chencongbao\\Foundation\\Facades\\FoundationTelegramWebhook",
                 "FoundationLog": "Chencongbao\\Foundation\\Facades\\FoundationLog",
                 "TronRpc": "Chencongbao\\Foundation\\Facades\\TronRpc"
             }

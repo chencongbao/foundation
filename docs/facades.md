@@ -15,4 +15,5 @@
 
 - `FoundationLog`：模块日志和异常日志；
 - `TronRpc`：TRON RPC 客户端；
-- `FoundationTelegram`：发送自定义文本、HTML 和代码块 Telegram 消息。
+- `FoundationTelegram`：发送消息并管理 Telegram Webhook 配置。
+- `FoundationTelegramWebhook`：处理 Telegram Webhook 请求、鉴权、去重和异常回调。

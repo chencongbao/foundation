@@ -16,6 +16,7 @@ use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
 use Chencongbao\Foundation\Services\Notification\TelegramExceptionNotifier;
 use Chencongbao\Foundation\Services\Notification\TelegramMessenger;
 use Chencongbao\Foundation\Services\Notification\TelegramNotificationSender;
+use Chencongbao\Foundation\Services\Notification\TelegramWebhookHandler;
 
 /**
  * 注册 foundation 包提供的共享基础服务。
@@ -48,6 +49,10 @@ class FoundationServiceProvider extends ServiceProvider
             new Client(),
             $app->make(LogManager::class),
             self::telegramConfig($app)
+        ));
+        $this->app->singleton(TelegramWebhookHandler::class, static fn ($app): TelegramWebhookHandler => new TelegramWebhookHandler(
+            $app->make(CacheRepository::class),
+            (array) $app['config']->get('foundation_log.telegram.webhook', [])
         ));
         $this->app->singleton(TelegramExceptionNotifier::class, static fn ($app): TelegramExceptionNotifier => new TelegramExceptionNotifier(
             $app->make(TelegramNotificationSender::class),

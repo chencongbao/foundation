@@ -73,3 +73,10 @@ php artisan queue:restart
 ```
 
 敏感信息不能写入默认配置或提交到 Git，应从宿主项目 `.env` 注入。
+
+Telegram Webhook 可配置请求 Secret Token 和 Update 去重时间：
+
+```dotenv
+FOUNDATION_TELEGRAM_WEBHOOK_SECRET_TOKEN=webhook_secret-123
+FOUNDATION_TELEGRAM_WEBHOOK_DEDUPLICATE_SECONDS=600
+```

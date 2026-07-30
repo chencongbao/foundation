@@ -68,6 +68,11 @@ return [
         'deduplicate_context_keys' => [],
         // 项目可配置必须每次通知、不参与去重的异常类。
         'deduplicate_exclude_exceptions' => [],
+        'webhook' => [
+            'secret_token' => (string) env('FOUNDATION_TELEGRAM_WEBHOOK_SECRET_TOKEN', ''),
+            'deduplicate_seconds' => max(0, (int) env('FOUNDATION_TELEGRAM_WEBHOOK_DEDUPLICATE_SECONDS', 600)),
+            'cache_prefix' => 'foundation:telegram:webhook:',
+        ],
         'queue' => [
             'enabled' => (bool) env('FOUNDATION_TELEGRAM_QUEUE_ENABLED', true),
             // 留空时跟随宿主项目 queue.default（即 QUEUE_CONNECTION）。
