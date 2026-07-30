@@ -192,20 +192,29 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 任何一项不满足都不会发送。Telegram 请求失败只返回失败状态，不抛出异常，不影响原
 业务。
 
-异常通知模板使用中文字段名：
+异常通知保留原有内容和中文字段，正文使用格式化 JSON：
 
-```text
-[应用名称] Foundation 异常通知
-运行环境：production
-功能模块：tron_rpc
-异常类型：RuntimeException
-异常消息：RPC 请求失败
-错误代码：0
-发生时间：2026-07-30T09:00:00+08:00
-上下文：{"node":"tronweb1"}
+```json
+{
+    "标题": "[tronweb4] Foundation 异常通知",
+    "运行环境": "production",
+    "功能模块": "tron_exception",
+    "异常类型": "App\\Exceptions\\TronProviderFailoverException",
+    "异常消息": "TRON fullnode primary provider switched to provider #2.",
+    "错误代码": 0,
+    "发生时间": "2026-07-30T15:15:37+08:00",
+    "上下文": {
+        "node": "tronweb4",
+        "error": "TRON 主节点已切换到备用节点",
+        "pool": "fullnode",
+        "backup_provider": "provider #2"
+    }
+}
 ```
 
-异常类名、模块名、原始异常消息和上下文数据不会翻译，确保诊断信息保持准确。
+标题中的应用名称来自 `APP_NAME`，传入的 Context 保持原结构，不会移动或改名。超过
+Telegram 长度限制时，过长的上下文会替换为 `truncated` 标记和 SHA-256 指纹，确保
+发送的正文始终是完整、可解析的 JSON。
 
 ## 相同异常去重
 

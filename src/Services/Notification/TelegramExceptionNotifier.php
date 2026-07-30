@@ -166,20 +166,65 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
 
     private function exceptionMessage(string $module, Throwable $exception, array $context): string
     {
-        $lines = [
-            '['.(string) ($this->config['application'] ?? 'Laravel').'] Foundation 异常通知',
-            '运行环境：'.(string) ($this->config['environment'] ?? '未知'),
-            '功能模块：'.$module,
-            '异常类型：'.get_class($exception),
-            '异常消息：'.$exception->getMessage(),
-            '错误代码：'.(string) $exception->getCode(),
-            '发生时间：'.date(DATE_ATOM),
+        $application = (string) ($this->config['application'] ?? 'Laravel');
+        $payload = [
+            '标题' => '['.$application.'] Foundation 异常通知',
+            '运行环境' => (string) ($this->config['environment'] ?? '未知'),
+            '功能模块' => $module,
+            '异常类型' => get_class($exception),
+            '异常消息' => $exception->getMessage(),
+            '错误代码' => $exception->getCode(),
+            '发生时间' => date(DATE_ATOM),
+            '上下文' => $context,
         ];
-        if ($context !== []) {
-            $json = json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-            $lines[] = '上下文：'.($json === false ? '{}' : $json);
+
+        $json = $this->encodeMessage($payload);
+        if (strlen($json) <= 3900) {
+            return $json;
         }
 
-        return substr(implode("\n", $lines), 0, 3900);
+        $contextJson = json_encode(
+            $context,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
+        );
+        $payload['标题'] = $this->truncateText('['.$application.'] Foundation 异常通知', 256);
+        $payload['运行环境'] = $this->truncateText((string) ($this->config['environment'] ?? '未知'), 128);
+        $payload['功能模块'] = $this->truncateText($module, 128);
+        $payload['异常类型'] = $this->truncateText(get_class($exception), 256);
+        $payload['异常消息'] = $this->truncateText($exception->getMessage(), 1000);
+        $payload['上下文'] = [
+            'truncated' => true,
+            'sha256' => hash('sha256', $contextJson === false ? serialize($context) : $contextJson),
+        ];
+
+        return $this->encodeMessage($payload);
+    }
+
+    private function encodeMessage(array $payload): string
+    {
+        $json = json_encode(
+            $payload,
+            JSON_PRETTY_PRINT
+            | JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_INVALID_UTF8_SUBSTITUTE
+            | JSON_PARTIAL_OUTPUT_ON_ERROR
+        );
+
+        return $json === false ? '{}' : $json;
+    }
+
+    private function truncateText(string $value, int $maxBytes): string
+    {
+        if (strlen($value) <= $maxBytes) {
+            return $value;
+        }
+
+        $value = substr($value, 0, max(0, $maxBytes - 3));
+        while ($value !== '' && preg_match('//u', $value) !== 1) {
+            $value = substr($value, 0, -1);
+        }
+
+        return $value.'...';
     }
 }

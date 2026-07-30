@@ -57,12 +57,69 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertCount(2, $requests);
         $this->assertStringContainsString('/bot123456:test-token/sendMessage', $requests[0]['uri']);
         $this->assertSame('-1001', $requests[0]['params']['chat_id']);
-        $this->assertStringContainsString('Foundation 异常通知', $requests[0]['params']['text']);
-        $this->assertStringContainsString('运行环境：production', $requests[0]['params']['text']);
-        $this->assertStringContainsString('功能模块：tron_rpc', $requests[0]['params']['text']);
-        $this->assertStringContainsString('异常类型：'.RuntimeException::class, $requests[0]['params']['text']);
-        $this->assertStringContainsString('异常消息：RPC failed', $requests[0]['params']['text']);
-        $this->assertStringContainsString('上下文：', $requests[0]['params']['text']);
+        $message = json_decode($requests[0]['params']['text'], true, 64, JSON_THROW_ON_ERROR);
+        $this->assertSame('[Robots] Foundation 异常通知', $message['标题']);
+        $this->assertSame('production', $message['运行环境']);
+        $this->assertSame('tron_rpc', $message['功能模块']);
+        $this->assertSame(RuntimeException::class, $message['异常类型']);
+        $this->assertSame('RPC failed', $message['异常消息']);
+        $this->assertSame(0, $message['错误代码']);
+        $this->assertIsString($message['发生时间']);
+        $this->assertSame([
+            'endpoint' => '127.0.0.1:9600',
+        ], $message['上下文']);
+    }
+
+    public function test_it_keeps_the_original_context_inside_the_json_message(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'application' => 'FallbackNode',
+            'queue' => ['enabled' => false],
+        ];
+        $notifier = $this->notifier($requests, $config);
+
+        $this->assertTrue($notifier->notify('tron_exception', new RuntimeException('provider switched'), [
+            'node' => 'tronweb4',
+            'pool' => 'fullnode',
+            'backup_provider' => 'provider #2',
+        ]));
+
+        $message = json_decode($requests[0]['params']['text'], true, 64, JSON_THROW_ON_ERROR);
+        $this->assertSame('[FallbackNode] Foundation 异常通知', $message['标题']);
+        $this->assertSame('tron_exception', $message['功能模块']);
+        $this->assertSame('tronweb4', $message['上下文']['node']);
+        $this->assertSame('fullnode', $message['上下文']['pool']);
+        $this->assertSame('provider #2', $message['上下文']['backup_provider']);
+    }
+
+    public function test_an_oversized_notification_remains_valid_json(): void
+    {
+        $requests = [];
+        $config = [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'application' => 'tronweb4',
+            'queue' => ['enabled' => false],
+        ];
+        $notifier = $this->notifier($requests, $config);
+
+        $this->assertTrue($notifier->notify('tron_exception', new RuntimeException(str_repeat('异常内容', 2000)), [
+            'node' => 'tronweb4',
+            'primary_error' => str_repeat('timeout ', 2000),
+        ]));
+
+        $text = $requests[0]['params']['text'];
+        $message = json_decode($text, true, 64, JSON_THROW_ON_ERROR);
+        $this->assertLessThanOrEqual(3900, strlen($text));
+        $this->assertTrue($message['上下文']['truncated']);
+        $this->assertSame(64, strlen($message['上下文']['sha256']));
     }
 
     public function test_it_dispatches_telegram_notifications_to_the_configured_queue(): void
