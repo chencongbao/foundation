@@ -22,6 +22,7 @@
 - [Jobs 队列任务](jobs.md)
 - [客户端 IP 解析](client-ip.md)
 - [模块日志与异常通知](logging.md)
+- [自定义 Telegram 消息](telegram-messenger.md)
 - [Rules 验证规则](rules.md)
 - [Services 服务](services.md)
 - [TRON RPC 服务](tron-rpc.md)

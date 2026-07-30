@@ -2,7 +2,6 @@
 
 namespace Chencongbao\Foundation\Tests\Unit;
 
-use RuntimeException;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Promise\Create;
@@ -12,6 +11,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Http\Message\RequestInterface;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Chencongbao\Foundation\Jobs\SendTelegramNotification;
+use Chencongbao\Foundation\Exceptions\TelegramTransportException;
 use Chencongbao\Foundation\Services\Notification\TelegramNotificationSender;
 
 class SendTelegramNotificationTest extends TestCase
@@ -35,10 +35,17 @@ class SendTelegramNotificationTest extends TestCase
         $sender = $this->sender(500, '{"ok":false}', $messages);
         $job = new SendTelegramNotification('failed message');
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(TelegramTransportException::class);
         $this->expectExceptionMessage('Foundation Telegram 通知发送失败。');
 
         $job->handle($sender);
+    }
+
+    public function test_transport_exception_marks_itself_as_already_reported(): void
+    {
+        $exception = new TelegramTransportException('failed');
+
+        $this->assertTrue($exception->report());
     }
 
     public function test_it_writes_detailed_failure_logs_for_a_telegram_api_error(): void
@@ -47,14 +54,16 @@ class SendTelegramNotificationTest extends TestCase
         $logger = \Mockery::mock(LoggerInterface::class);
         $logger->shouldReceive('error')
             ->once()
-            ->with('[telegram] Telegram API 返回发送失败', \Mockery::on(static function (array $context): bool {
-                return $context['chat_id'] === '-1001'
-                    && $context['http_status'] === 400
-                    && $context['telegram_error_code'] === 400
-                    && $context['telegram_description'] === 'Bad Request: chat not found'
-                    && $context['response_is_json'] === true
-                    && strlen($context['message_hash']) === 64;
-            }));
+            ->with(\Mockery::on(static function (string $message): bool {
+                return str_contains($message, 'Telegram 通知失败')
+                    && str_contains($message, '错误说明：Telegram API 返回发送失败')
+                    && str_contains($message, '"chat_id": "-1001"')
+                    && str_contains($message, '"http_status": 400')
+                    && str_contains($message, '"telegram_error_code": 400')
+                    && str_contains($message, '"telegram_description": "Bad Request: chat not found"')
+                    && str_contains($message, '"response_is_json": true')
+                    && str_contains($message, '"message_hash":');
+            }), []);
 
         $logs = \Mockery::mock(LogManager::class);
         $logs->shouldReceive('build')
@@ -91,13 +100,12 @@ class SendTelegramNotificationTest extends TestCase
         $logger = \Mockery::mock(LoggerInterface::class);
         $logger->shouldReceive('error')
             ->once()
-            ->with('[telegram] test failure', [
-                'exception_message' => 'request to bot[REDACTED]/sendMessage failed',
-                'bot_token' => '[REDACTED]',
-                'nested' => [
-                    'authorization' => '[REDACTED]',
-                ],
-            ]);
+            ->with(\Mockery::on(static function (string $message): bool {
+                return str_contains($message, '错误说明：test failure')
+                    && str_contains($message, '"exception_message": "request to bot[REDACTED]/sendMessage failed"')
+                    && str_contains($message, '"bot_token": "[REDACTED]"')
+                    && str_contains($message, '"authorization": "[REDACTED]"');
+            }), []);
 
         $logs = \Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('stack')->andReturn($logger);

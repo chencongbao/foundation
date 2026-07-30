@@ -6,6 +6,7 @@ use Throwable;
 use Illuminate\Log\LogManager;
 use GuzzleHttp\ClientInterface;
 use Psr\Log\LoggerInterface;
+use Chencongbao\Foundation\Services\Logging\ReadableLogFormatter;
 
 final class TelegramNotificationSender
 {
@@ -50,6 +51,20 @@ final class TelegramNotificationSender
                     'parse_mode' => 'HTML',
                     'disable_web_page_preview' => true,
                 ];
+                $replyParameters = (array) ($this->config['reply_parameters'] ?? []);
+                if (isset($replyParameters['message_id'])) {
+                    $params['reply_parameters'] = json_encode(
+                        $replyParameters,
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                    );
+                }
+                $replyMarkup = (array) ($this->config['reply_markup'] ?? []);
+                if (isset($replyMarkup['inline_keyboard'])) {
+                    $params['reply_markup'] = json_encode(
+                        $replyMarkup,
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                    );
+                }
 
                 $response = $this->httpClient->request('POST', $this->endpoint(), [
                     'connect_timeout' => min(1.0, (float) $this->config['timeout_seconds']),
@@ -97,7 +112,12 @@ final class TelegramNotificationSender
 
         try {
             $logger = $this->failureLogger();
-            $logger->error('[telegram] '.$message, $this->sanitizeContext($context));
+            $safeContext = $this->sanitizeContext($context);
+            $node = trim((string) ($safeContext['node'] ?? $this->config['application'] ?? '-'));
+            $logger->error(ReadableLogFormatter::format('Telegram 通知失败', [
+                '节点名称' => $node === '' ? '-' : $node,
+                '错误说明' => $message,
+            ], $safeContext), []);
         } catch (Throwable) {
             // 通知失败日志不能覆盖原始异常，也不能阻断队列的正常重试。
         }

@@ -10,3 +10,9 @@
 - 同时保留构造函数依赖注入的使用方式。
 
 核心业务类优先依赖注入，Facade 更适合控制器、命令等 Laravel 边界层。
+
+当前提供：
+
+- `FoundationLog`：模块日志和异常日志；
+- `TronRpc`：TRON RPC 客户端；
+- `FoundationTelegram`：发送自定义文本、HTML 和代码块 Telegram 消息。

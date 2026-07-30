@@ -3,6 +3,8 @@
 namespace Chencongbao\Foundation\Services\Notification;
 
 use Throwable;
+use DateTimeZone;
+use DateTimeImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
@@ -175,6 +177,8 @@ final class TelegramExceptionNotifier implements ExceptionNotifier
             'message' => $exception->getMessage(),
             'file' => $this->relativePath($exception->getFile()),
             'line' => $exception->getLine(),
+            'time' => (new DateTimeImmutable('now', new DateTimeZone('Asia/Shanghai')))
+                ->format('Y-m-d H:i:s'),
             'context' => $context,
         ];
 

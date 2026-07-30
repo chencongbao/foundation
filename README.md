@@ -62,6 +62,11 @@ Foundation 的 Telegram 异常通知默认投递到 Laravel Queue。生产环境
 配置 `FOUNDATION_TELEGRAM_QUEUE` 后使用指定队列。详细配置见
 [模块日志与异常通知](docs/logging.md)。
 
+项目主动发送自定义 Telegram 消息时使用 `TelegramMessenger` 或
+`FoundationTelegram` Facade，可按次指定 Bot Token、一个或多个 Chat ID，并发送
+纯文本、HTML、格式化 JSON 或带复制按钮的代码块。详细用法见
+[自定义 Telegram 消息](docs/telegram-messenger.md)。
+
 ## TRON 基础工具
 
 不需要调用节点的地址校验、地址格式转换和数量换算使用 `Support\Tron`：

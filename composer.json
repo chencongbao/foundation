@@ -40,6 +40,7 @@
                 "Chencongbao\\Foundation\\FoundationServiceProvider"
             ],
             "aliases": {
+                "FoundationTelegram": "Chencongbao\\Foundation\\Facades\\FoundationTelegram",
                 "FoundationLog": "Chencongbao\\Foundation\\Facades\\FoundationLog",
                 "TronRpc": "Chencongbao\\Foundation\\Facades\\TronRpc"
             }

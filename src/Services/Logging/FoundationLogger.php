@@ -69,7 +69,14 @@ final class FoundationLogger
 
         $cacheKey = $this->loggerCacheKey($module, $settings);
         $logger = $this->moduleLoggers[$cacheKey] ??= $this->moduleLogger($settings);
-        $logger->log($level, '['.$module.'] '.$message, $this->sanitize($context));
+        $safeContext = $this->sanitize($context);
+        $node = trim((string) ($safeContext['node'] ?? $this->config['telegram']['application'] ?? '-'));
+        $logger->log($level, ReadableLogFormatter::format('Foundation 模块日志', [
+            '节点名称' => $node === '' ? '-' : $node,
+            '功能模块' => $module,
+            '日志级别' => strtoupper($level),
+            '日志消息' => $message,
+        ], $safeContext), []);
     }
 
     public function message(
@@ -131,58 +138,97 @@ final class FoundationLogger
         $logger = $this->moduleLoggers[$cacheKey] ??= $this->moduleLogger($settings);
         $logger->log(
             LogLevel::ERROR,
-            '['.$module.'] '.$exception->getMessage(),
-            array_merge($context, $this->exceptionDetails($exception))
+            $this->formatExceptionLog($module, $exception, $context),
+            []
         );
     }
 
-    private function exceptionDetails(Throwable $exception): array
+    private function formatExceptionLog(string $module, Throwable $exception, array $context): string
     {
-        $previous = [];
-        $current = $exception->getPrevious();
-        $depth = 0;
+        $node = trim((string) ($context['node'] ?? $this->config['telegram']['application'] ?? '-'));
+        $environment = trim((string) ($this->config['telegram']['environment'] ?? '-'));
+        $location = $this->relativePath($exception->getFile()).':'.$exception->getLine();
+        $lines = [
+            '',
+            '==================== Foundation 异常详情 ====================',
+            '发生时间：'.ReadableLogFormatter::beijingTime(),
+            '节点名称：'.($node === '' ? '-' : $node),
+            '功能模块：'.$module,
+            '运行环境：'.($environment === '' ? '-' : $environment),
+            '异常类型：'.get_class($exception),
+            '错误代码：'.(string) $exception->getCode(),
+            '异常消息：'.$exception->getMessage(),
+            '异常位置：'.$location,
+            '------------------------- 上下文 -------------------------',
+            ReadableLogFormatter::prettyJson($context),
+        ];
 
-        while ($current !== null && $depth < 10) {
-            $previous[] = [
-                'exception' => get_class($current),
-                'message' => $current->getMessage(),
-                'code' => $current->getCode(),
-                'file' => $current->getFile(),
-                'line' => $current->getLine(),
-                'trace' => $this->safeTrace($current),
-            ];
+        $current = $exception->getPrevious();
+        if ($current !== null) {
+            $lines[] = '----------------------- 前置异常链 -----------------------';
+        }
+        $depth = 1;
+        while ($current !== null && $depth <= 10) {
+            $lines[] = sprintf(
+                '#%d %s（代码：%s）',
+                $depth,
+                get_class($current),
+                (string) $current->getCode()
+            );
+            $lines[] = '   消息：'.$current->getMessage();
+            $lines[] = '   位置：'.$this->relativePath($current->getFile()).':'.$current->getLine();
             $current = $current->getPrevious();
             $depth++;
         }
 
-        return [
-            'exception' => get_class($exception),
-            'exception_message' => $exception->getMessage(),
-            'code' => $exception->getCode(),
-            'file' => $exception->getFile(),
-            'line' => $exception->getLine(),
-            'trace' => $this->safeTrace($exception),
-            'previous' => $previous,
-            'runtime' => [
-                'sapi' => PHP_SAPI,
-                'pid' => getmypid(),
-                'memory_usage' => memory_get_usage(true),
-                'memory_peak_usage' => memory_get_peak_usage(true),
-            ],
-        ];
+        $lines[] = '------------------------- 调用栈 -------------------------';
+        $trace = $exception->getTrace();
+        if ($trace === []) {
+            $lines[] = '（无调用栈）';
+        }
+        foreach ($trace as $index => $frame) {
+            $frameLocation = isset($frame['file'])
+                ? $this->relativePath((string) $frame['file']).':'.(string) ($frame['line'] ?? '?')
+                : '[internal]';
+            $call = (string) ($frame['class'] ?? '')
+                .(string) ($frame['type'] ?? '')
+                .(string) ($frame['function'] ?? 'unknown');
+            $lines[] = sprintf('#%d %s  %s()', $index, $frameLocation, $call);
+        }
+
+        $lines = array_merge($lines, [
+            '------------------------- 运行信息 -----------------------',
+            '主机名称：'.(gethostname() ?: '-'),
+            'PHP 版本：'.PHP_VERSION,
+            '运行模式：'.PHP_SAPI,
+            '进程 ID：'.(string) (getmypid() ?: '-'),
+            '当前内存：'.ReadableLogFormatter::formatBytes(memory_get_usage(true)),
+            '峰值内存：'.ReadableLogFormatter::formatBytes(memory_get_peak_usage(true)),
+            '============================================================',
+            '',
+        ]);
+
+        return implode("\n", $lines);
     }
 
-    private function safeTrace(Throwable $exception): array
+    private function relativePath(string $file): string
     {
-        return array_map(static function (array $frame): array {
-            return [
-                'file' => $frame['file'] ?? null,
-                'line' => $frame['line'] ?? null,
-                'class' => $frame['class'] ?? null,
-                'type' => $frame['type'] ?? null,
-                'function' => $frame['function'] ?? null,
-            ];
-        }, $exception->getTrace());
+        $file = str_replace('\\', '/', $file);
+        if (!function_exists('app')) {
+            return $file;
+        }
+
+        try {
+            $application = app();
+            if (!is_object($application) || !method_exists($application, 'basePath')) {
+                return $file;
+            }
+            $basePath = rtrim(str_replace('\\', '/', (string) $application->basePath()), '/').'/';
+        } catch (Throwable) {
+            return $file;
+        }
+
+        return str_starts_with($file, $basePath) ? substr($file, strlen($basePath)) : $file;
     }
 
     private function moduleSettings(string $module): array

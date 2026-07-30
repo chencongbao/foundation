@@ -63,6 +63,31 @@ FOUNDATION_LOG_CLIENT_IP_PATH=/绝对路径/logs/{date}/foundation/client_ip.log
 `{date}` 会在每次写入时替换成当前日期。常驻 Worker 跨过零点后会自动切换到新的日期
 目录，文件名保持不变。
 
+## 统一可读格式
+
+Foundation 产生的普通模块日志、异常日志和 Telegram 失败日志都使用多行分区格式。
+普通模块日志示例：
+
+```text
+==================== Foundation 模块日志 ====================
+发生时间：2026-07-30 16:10:25
+节点名称：tronweb4
+功能模块：tron_rpc
+日志级别：INFO
+日志消息：RPC 请求成功
+------------------------- 上下文 -------------------------
+{
+    "request_id": "8bc12d...",
+    "method": "tron.address.balance",
+    "endpoint": "http://172.26.179.233:9600",
+    "http_status": 200
+}
+============================================================
+```
+
+普通模块日志的 Context 也会递归脱敏并格式化缩进，不再追加为单行 JSON。所有区块中的
+`发生时间` 固定使用北京时间。
+
 ## 写日志
 
 推荐依赖注入：
@@ -143,11 +168,42 @@ storage/logs/YYYY-MM-DD/foundation/exception.log
 
 每条异常日志包含：
 
-- 模块名、异常类、异常消息和错误代码；
+- 北京时间、节点、模块、环境、异常类、异常消息和错误代码；
 - 异常文件、行号和不包含函数参数的调用栈；
-- 最多 10 层前置异常链及其调用栈；
-- PHP SAPI、进程 ID、当前内存和峰值内存；
+- 最多 10 层前置异常链的类型、消息和位置；
+- 主机名、PHP 版本、PHP SAPI、进程 ID、当前内存和峰值内存；
 - 调用 `exception()` 时传入并完成敏感字段脱敏的 Context。
+
+日志采用多行分区格式，不会再把 Context 和整个调用栈压缩成一行：
+
+```text
+==================== Foundation 异常详情 ====================
+发生时间：2026-07-30 15:37:18
+节点名称：tronweb4
+功能模块：tron_exception
+运行环境：production
+异常类型：App\Exceptions\TronProviderFailoverException
+错误代码：0
+异常消息：TRON fullnode primary provider switched to provider #2.
+异常位置：app/Services/Tron/TronProviderService.php:313
+------------------------- 上下文 -------------------------
+{
+    "node": "tronweb4",
+    "pool": "fullnode",
+    "backup_provider": "provider #2"
+}
+------------------------- 调用栈 -------------------------
+#0 app/Services/Tron/TronProviderService.php:266  App\Services\Tron\TronProviderService->requestFromPool()
+#1 app/Jobs/GetTronscanBlocknumberResultDataJob.php:100  App\Services\Tron\TronProviderService->blockByNumber()
+------------------------- 运行信息 -----------------------
+主机名称：tronweb4
+PHP 版本：8.0.30
+运行模式：cli
+进程 ID：12345
+当前内存：24.00 MB
+峰值内存：26.00 MB
+============================================================
+```
 
 调用栈刻意不记录函数参数，避免 Token、密码或业务数据通过参数意外进入日志。异常日志
 写入失败不会阻断 Telegram 通知，也不会覆盖原始业务异常。
@@ -201,6 +257,7 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
     "message": "TRON fullnode primary provider switched to provider #2.",
     "file": "app/Services/Tron/TronProviderService.php",
     "line": 312,
+    "time": "2026-07-30 15:15:37",
     "context": {
         "error": "TRON 主节点已切换到备用节点",
         "pool": "fullnode",
@@ -213,6 +270,9 @@ FOUNDATION_TELEGRAM_QUEUE_BACKOFF=5
 会提升到顶层 `node`，没有传入时使用 `APP_NAME`；异常文件尽量转换为宿主项目相对
 路径。超过 Telegram 长度限制时，过长的 Context 会替换为 `truncated` 标记和
 SHA-256 指纹，确保代码块中的正文始终是完整、可解析的 JSON。
+
+`time` 固定使用 `Asia/Shanghai` 北京时间，格式为 `Y-m-d H:i:s`，不受服务器默认
+时区影响。
 
 项目如需固定或自定义标题，可在 `config/foundation_custom.php` 中覆盖，`{node}` 会
 替换成当前节点名称：
@@ -372,6 +432,23 @@ storage/logs/YYYY-MM-DD/foundation/telegram.log
 异常位置、当前重试次数、队列和连接名称。通知正文只记录 SHA-256 指纹，不写入原文；
 Bot Token、Authorization 和 Secret 会脱敏。失败日志不受普通日志开关影响，日志写入
 自身发生故障时也不会阻断业务或队列重试。
+
+Telegram 失败日志同样使用多行格式：
+
+```text
+==================== Telegram 通知失败 ====================
+发生时间：2026-07-30 16:12:30
+节点名称：tronweb4
+错误说明：Telegram API 返回发送失败
+------------------------- 上下文 -------------------------
+{
+    "chat_id": "-1001234567890",
+    "http_status": 400,
+    "telegram_error_code": 400,
+    "telegram_description": "Bad Request: chat not found"
+}
+============================================================
+```
 
 如需修改失败日志路径，在 `config/foundation_custom.php` 中覆盖：
 

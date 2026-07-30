@@ -65,6 +65,10 @@ class TelegramExceptionNotifierTest extends TestCase
         $this->assertSame('RPC failed', $message['message']);
         $this->assertIsString($message['file']);
         $this->assertIsInt($message['line']);
+        $this->assertMatchesRegularExpression(
+            '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+            $message['time']
+        );
         $this->assertSame([
             'endpoint' => '127.0.0.1:9600',
         ], $message['context']);
@@ -233,13 +237,15 @@ class TelegramExceptionNotifierTest extends TestCase
         $logger = Mockery::mock(LoggerInterface::class);
         $logger->shouldReceive('error')
             ->once()
-            ->with('[telegram] Telegram 通知任务投递队列失败', Mockery::on(static function (array $context): bool {
-                return $context['exception'] === RuntimeException::class
-                    && $context['exception_message'] === 'Redis unavailable'
-                    && $context['queue'] === 'notice'
-                    && $context['connection'] === 'redis'
-                    && strlen($context['message_hash']) === 64;
-            }));
+            ->with(Mockery::on(static function (string $message): bool {
+                return str_contains($message, 'Telegram 通知失败')
+                    && str_contains($message, '错误说明：Telegram 通知任务投递队列失败')
+                    && str_contains($message, '"exception": "'.RuntimeException::class.'"')
+                    && str_contains($message, '"exception_message": "Redis unavailable"')
+                    && str_contains($message, '"queue": "notice"')
+                    && str_contains($message, '"connection": "redis"')
+                    && str_contains($message, '"message_hash":');
+            }), []);
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('daily')->andReturn($logger);
 

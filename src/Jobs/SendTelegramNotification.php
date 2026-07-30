@@ -2,11 +2,11 @@
 
 namespace Chencongbao\Foundation\Jobs;
 
-use RuntimeException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Chencongbao\Foundation\Exceptions\TelegramTransportException;
 use Chencongbao\Foundation\Services\Notification\TelegramNotificationSender;
 
 final class SendTelegramNotification implements ShouldQueue
@@ -39,7 +39,7 @@ final class SendTelegramNotification implements ShouldQueue
                 'message_hash' => hash('sha256', $this->message),
             ]);
 
-            throw new RuntimeException('Foundation Telegram 通知发送失败。');
+            throw new TelegramTransportException('Foundation Telegram 通知发送失败。');
         }
     }
 

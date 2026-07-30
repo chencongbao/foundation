@@ -14,6 +14,7 @@ use Chencongbao\Foundation\Support\ConfigMerger;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
 use Chencongbao\Foundation\Services\Http\TrustedProxyClientIpResolver;
 use Chencongbao\Foundation\Services\Notification\TelegramExceptionNotifier;
+use Chencongbao\Foundation\Services\Notification\TelegramMessenger;
 use Chencongbao\Foundation\Services\Notification\TelegramNotificationSender;
 
 /**
@@ -42,6 +43,11 @@ class FoundationServiceProvider extends ServiceProvider
             new Client(),
             (array) $app['config']->get('foundation_log.telegram', []),
             $app->make(LogManager::class)
+        ));
+        $this->app->singleton(TelegramMessenger::class, static fn ($app): TelegramMessenger => new TelegramMessenger(
+            new Client(),
+            $app->make(LogManager::class),
+            (array) $app['config']->get('foundation_log.telegram', [])
         ));
         $this->app->singleton(TelegramExceptionNotifier::class, static fn ($app): TelegramExceptionNotifier => new TelegramExceptionNotifier(
             $app->make(TelegramNotificationSender::class),

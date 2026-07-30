@@ -21,17 +21,16 @@ class FoundationLoggerTest extends TestCase
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
             ->once()
-            ->with('error', '[tron_rpc] RPC failed', Mockery::on(static function (array $context): bool {
-                return $context['token'] === '[REDACTED]'
-                    && $context['nested']['authorization'] === '[REDACTED]'
-                    && $context['exception'] === RuntimeException::class
-                    && $context['exception_message'] === 'RPC failed'
-                    && is_string($context['file'])
-                    && is_int($context['line'])
-                    && is_array($context['trace'])
-                    && is_array($context['previous'])
-                    && is_array($context['runtime']);
-            }));
+            ->with('error', Mockery::on(static function (string $message): bool {
+                return str_contains($message, 'Foundation 异常详情')
+                    && str_contains($message, '功能模块：tron_rpc')
+                    && str_contains($message, '异常类型：'.RuntimeException::class)
+                    && str_contains($message, '异常消息：RPC failed')
+                    && str_contains($message, '"token": "[REDACTED]"')
+                    && str_contains($message, '"authorization": "[REDACTED]"')
+                    && str_contains($message, '调用栈')
+                    && str_contains($message, '运行信息');
+            }), []);
 
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
@@ -75,7 +74,13 @@ class FoundationLoggerTest extends TestCase
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
             ->once()
-            ->with('info', '[tron_rpc] request completed', ['method' => 'system.health']);
+            ->with('info', Mockery::on(static function (string $message): bool {
+                return str_contains($message, 'Foundation 模块日志')
+                    && str_contains($message, '功能模块：tron_rpc')
+                    && str_contains($message, '日志级别：INFO')
+                    && str_contains($message, '日志消息：request completed')
+                    && str_contains($message, '"method": "system.health"');
+            }), []);
 
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('build')
@@ -104,7 +109,10 @@ class FoundationLoggerTest extends TestCase
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
             ->once()
-            ->with('error', '[tron_rpc] failed', Mockery::type('array'));
+            ->with('error', Mockery::on(static fn (string $message): bool => str_contains(
+                $message,
+                '异常消息：failed'
+            )), []);
 
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
@@ -130,7 +138,10 @@ class FoundationLoggerTest extends TestCase
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
             ->once()
-            ->with('error', '[client_ip] resolve failed', Mockery::type('array'));
+            ->with('error', Mockery::on(static function (string $message): bool {
+                return str_contains($message, '功能模块：client_ip')
+                    && str_contains($message, '异常消息：resolve failed');
+            }), []);
 
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
@@ -153,7 +164,10 @@ class FoundationLoggerTest extends TestCase
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
             ->twice()
-            ->with('error', '[tron_rpc] repeated failure', Mockery::type('array'));
+            ->with('error', Mockery::on(static fn (string $message): bool => str_contains(
+                $message,
+                '异常消息：repeated failure'
+            )), []);
 
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
@@ -174,15 +188,13 @@ class FoundationLoggerTest extends TestCase
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
             ->once()
-            ->with('error', '[tron_rpc] outer failure', Mockery::on(static function (array $context): bool {
-                $frames = array_merge($context['trace'], $context['previous'][0]['trace']);
-
-                return $context['previous'][0]['exception'] === RuntimeException::class
-                    && $context['previous'][0]['message'] === 'root failure'
-                    && array_reduce($frames, static function (bool $safe, array $frame): bool {
-                        return $safe && !array_key_exists('args', $frame);
-                    }, true);
-            }));
+            ->with('error', Mockery::on(static function (string $message): bool {
+                return str_contains($message, '前置异常链')
+                    && str_contains($message, '#1 '.RuntimeException::class)
+                    && str_contains($message, '消息：root failure')
+                    && str_contains($message, '调用栈')
+                    && !str_contains($message, 'args');
+            }), []);
 
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
@@ -222,10 +234,13 @@ class FoundationLoggerTest extends TestCase
         $channel = Mockery::mock(LoggerInterface::class);
         $channel->shouldReceive('log')
             ->once()
-            ->with('warning', '[payment] payment delayed', [
-                'order_no' => 'P100',
-                'token' => '[REDACTED]',
-            ]);
+            ->with('warning', Mockery::on(static function (string $message): bool {
+                return str_contains($message, '功能模块：payment')
+                    && str_contains($message, '日志级别：WARNING')
+                    && str_contains($message, '日志消息：payment delayed')
+                    && str_contains($message, '"order_no": "P100"')
+                    && str_contains($message, '"token": "[REDACTED]"');
+            }), []);
 
         $logs = Mockery::mock(LogManager::class);
         $logs->shouldReceive('channel')->once()->with('daily')->andReturn($channel);
