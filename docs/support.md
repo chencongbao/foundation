@@ -10,6 +10,7 @@
 - `Money`：使用最小货币单位安全格式化金额；
 - `Tron`：不调用节点的 TRON 地址、交易 ID、私钥格式和数量换算工具；
 - `Tree`：将扁平数组构造成树。
+- `Crypto\Aes`、`Crypto\Rsa`、`Crypto\TripleDes`：支付协议常用的本地密码工具。
 
 Support 类不能访问数据库、缓存、Request 或远程服务。涉及这些依赖时应放入
 `Services/`。新增方法前先检查 Laravel 自身是否已经提供，避免重复封装。
@@ -53,3 +54,6 @@ $amount = Tron::rawToToken($raw, 18);
 金额换算只接受 `int|string`，不会使用浮点数。输入小数位超过 Token 精度时直接抛出
 `InvalidArgumentException`，不会静默四舍五入。`isPrivateKey()` 只校验 32 字节 Hex
 格式和 secp256k1 私钥值域，不会验证它是否属于某个地址，也不会记录或保存私钥。
+
+AES、RSA 与 3DES 的算法、编码、异常规则和调用示例见
+[密码协议工具](crypto.md)。

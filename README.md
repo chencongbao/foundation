@@ -88,6 +88,22 @@ $trx = Tron::sunToTrx($sun);
 
 完整方法见 [Support 通用工具](docs/support.md)。
 
+## 密码协议工具
+
+支付接口常用的 AES、RSA 和 3DES 本地处理能力位于 `Support\Crypto`：
+
+```php
+use Chencongbao\Foundation\Support\Crypto\Aes;
+use Chencongbao\Foundation\Support\Crypto\Rsa;
+use Chencongbao\Foundation\Support\Crypto\TripleDes;
+
+$ciphertext = Aes::encryptCbcBase64($plainText, $key, $iv, 128);
+$signature = Rsa::signBase64($data, $privateKey, OPENSSL_ALGO_SHA256);
+$encrypted = TripleDes::encryptBase64($plainText, $key, $iv);
+```
+
+完整方法和协议注意事项见 [AES、RSA 与 3DES 工具](docs/crypto.md)。
+
 ## TRON 内网 RPC
 
 包会通过 Laravel Package Discovery 自动注册 `TronRpcClient` 和 `TronRpc` Facade。

@@ -12,3 +12,7 @@
 Laravel Queue，因此正常参与重试并可进入 `failed_jobs`；但其 `report()` 返回
 `true`，表示 Foundation 已将失败详情写入 `telegram_failure.log`，Laravel 不应再把它交给
 全局异常上报入口，避免“通知失败后再次发送通知”的递归循环。
+
+`CryptoException` 表示 AES、RSA 或 3DES 的密钥解析、参数校验、加密、解密、签名或
+验签执行失败。异常只描述失败阶段，不包含密钥和原始敏感数据；调用项目可补充通道、
+订单号等非敏感上下文后记录日志。

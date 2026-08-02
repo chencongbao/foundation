@@ -28,6 +28,7 @@
 - [Services 服务](services.md)
 - [TRON RPC 服务](tron-rpc.md)
 - [Support 通用工具](support.md)
+- [AES、RSA 与 3DES 工具](crypto.md)
 - [Traits 复用能力](traits.md)
 - [ValueObjects 值对象](value-objects.md)
 
