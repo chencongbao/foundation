@@ -208,6 +208,48 @@ class SendTelegramNotificationTest extends TestCase
         $this->assertTrue($sender->send('message'));
     }
 
+    public function test_it_writes_a_safe_success_log_for_a_photo(): void
+    {
+        $logger = \Mockery::mock(LoggerInterface::class);
+        $logger->shouldReceive('info')
+            ->once()
+            ->with(\Mockery::on(static function (string $message): bool {
+                return str_contains($message, '操作说明：Telegram 图片发送成功')
+                    && str_contains($message, '"photo_source": "remote_or_file_id"')
+                    && str_contains($message, '"telegram_message_id": 9528')
+                    && str_contains($message, '"photo_reference_hash":')
+                    && str_contains($message, '"caption_hash":')
+                    && !str_contains($message, 'private.example.com/order.png')
+                    && !str_contains($message, 'private photo caption');
+            }), []);
+
+        $logs = \Mockery::mock(LogManager::class);
+        $logs->shouldReceive('channel')->once()->with('stack')->andReturn($logger);
+        $handler = static function (RequestInterface $_request, array $_options) {
+            return Create::promiseFor(new Response(200, [
+                'Content-Type' => 'application/json',
+            ], '{"ok":true,"result":{"message_id":9528}}'));
+        };
+        $sender = new TelegramNotificationSender(new Client(['handler' => $handler]), [
+            'enabled' => true,
+            'bot_token' => '123456:test-token',
+            'chat_ids' => ['-1001'],
+            'timeout_seconds' => 3,
+            'application' => 'robots',
+            'activity_log' => [
+                'enabled' => true,
+                'channel' => 'stack',
+                'path' => null,
+                'level' => 'info',
+            ],
+        ], $logs);
+
+        $this->assertTrue($sender->sendPhoto(
+            'https://private.example.com/order.png?token=secret',
+            'private photo caption'
+        ));
+    }
+
     public function test_failure_log_context_redacts_the_bot_token_and_sensitive_keys(): void
     {
         $logger = \Mockery::mock(LoggerInterface::class);

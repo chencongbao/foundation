@@ -307,6 +307,106 @@ class TelegramMessengerTest extends TestCase
         $messenger->sendJson('{invalid json}');
     }
 
+    public function test_it_sends_a_photo_url_with_caption_reply_buttons_and_options(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $sent = $messenger
+            ->replyTo(9527, true)
+            ->withButtons([
+                ['text' => '查看订单', 'url' => 'https://example.com/orders/1'],
+            ])
+            ->sendPhoto(
+                'https://example.com/order.png',
+                '<b>订单异常</b>',
+                [
+                    'show_caption_above_media' => true,
+                    'has_spoiler' => true,
+                    'protect_content' => true,
+                ]
+            );
+
+        $this->assertTrue($sent);
+        $this->assertStringContainsString('/sendPhoto', $requests[0]['uri']);
+        $this->assertSame('https://example.com/order.png', $requests[0]['params']['photo']);
+        $this->assertSame('<b>订单异常</b>', $requests[0]['params']['caption']);
+        $this->assertSame('HTML', $requests[0]['params']['parse_mode']);
+        $this->assertSame('1', $requests[0]['params']['show_caption_above_media']);
+        $this->assertSame('1', $requests[0]['params']['has_spoiler']);
+        $this->assertSame('1', $requests[0]['params']['protect_content']);
+        $this->assertSame(9527, json_decode(
+            $requests[0]['params']['reply_parameters'],
+            true
+        )['message_id']);
+        $this->assertSame('查看订单', json_decode(
+            $requests[0]['params']['reply_markup'],
+            true
+        )['inline_keyboard'][0][0]['text']);
+    }
+
+    public function test_it_accepts_a_telegram_photo_file_id(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->assertTrue($messenger->sendPhoto('AgACAgQAAxkBAAIBQ2-photo-file-id'));
+        $this->assertSame('AgACAgQAAxkBAAIBQ2-photo-file-id', $requests[0]['params']['photo']);
+    }
+
+    public function test_it_uploads_a_local_photo_using_multipart_form_data(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+        $path = sys_get_temp_dir().'/foundation-telegram-photo-'.bin2hex(random_bytes(6)).'.png';
+        file_put_contents($path, base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            true
+        ));
+
+        try {
+            $this->assertTrue($messenger->sendPhotoFile($path, '<b>本地截图</b>'));
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertStringContainsString('/sendPhoto', $requests[0]['uri']);
+        $this->assertStringStartsWith('multipart/form-data;', $requests[0]['content_type']);
+        $this->assertStringContainsString('name="photo"', $requests[0]['body']);
+        $this->assertStringContainsString(basename($path), $requests[0]['body']);
+        $this->assertStringContainsString('<b>本地截图</b>', $requests[0]['body']);
+    }
+
+    public function test_it_rejects_a_missing_local_photo(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('本地图片不存在或不可读');
+        $messenger->sendPhotoFile('/tmp/foundation-missing-photo.png');
+    }
+
+    public function test_it_rejects_an_overlong_photo_caption(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('图片说明不能超过 1024 个字符');
+        $messenger->sendPhoto('photo-file-id', str_repeat('图', 1025));
+    }
+
+    public function test_it_rejects_unknown_photo_options(): void
+    {
+        $requests = [];
+        $messenger = $this->messenger($requests);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('不支持的 Telegram 图片参数');
+        $messenger->sendPhoto('photo-file-id', '', ['unknown' => true]);
+    }
+
     public function test_it_sets_a_webhook_with_a_custom_token_and_options(): void
     {
         $requests = [];
@@ -372,11 +472,18 @@ class TelegramMessengerTest extends TestCase
     private function messenger(array &$requests): TelegramMessenger
     {
         $handler = static function (RequestInterface $request, array $_options) use (&$requests) {
-            parse_str((string) $request->getBody(), $params);
+            $body = (string) $request->getBody();
+            $contentType = $request->getHeaderLine('Content-Type');
+            $params = [];
+            if (!str_starts_with($contentType, 'multipart/form-data;')) {
+                parse_str($body, $params);
+            }
             $requests[] = [
                 'uri' => (string) $request->getUri(),
                 'chat_id' => $params['chat_id'] ?? null,
                 'params' => $params,
+                'content_type' => $contentType,
+                'body' => $body,
             ];
 
             $path = $request->getUri()->getPath();

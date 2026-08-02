@@ -188,6 +188,154 @@ final class TelegramNotificationSender
     }
 
     /**
+     * 使用 URL 或 Telegram file_id 发送图片。
+     */
+    public function sendPhoto(string $photo, string $caption = '', array $options = []): bool
+    {
+        return $this->sendPhotoMessage($photo, $caption, $options, false);
+    }
+
+    /**
+     * 使用 multipart/form-data 上传并发送本地图片。
+     */
+    public function sendPhotoFile(string $path, string $caption = '', array $options = []): bool
+    {
+        return $this->sendPhotoMessage($path, $caption, $options, true);
+    }
+
+    private function sendPhotoMessage(
+        string $photo,
+        string $caption,
+        array $options,
+        bool $upload
+    ): bool {
+        if (!$this->configured()) {
+            $this->reportFailure('Telegram 图片通知配置不完整', [
+                'telegram_enabled' => ($this->config['enabled'] ?? false) === true,
+                'bot_token_configured' => trim((string) ($this->config['bot_token'] ?? '')) !== '',
+                'chat_ids_count' => count((array) ($this->config['chat_ids'] ?? [])),
+                'photo_source' => $upload ? 'upload' : 'remote_or_file_id',
+            ]);
+
+            return false;
+        }
+
+        $success = true;
+        $replyParameters = (array) ($this->config['reply_parameters'] ?? []);
+        $replyMarkup = (array) ($this->config['reply_markup'] ?? []);
+        foreach ((array) $this->config['chat_ids'] as $chatId) {
+            $startedAt = microtime(true);
+            $stream = null;
+            try {
+                $params = [
+                    'chat_id' => (string) $chatId,
+                    'caption' => $caption,
+                    'parse_mode' => 'HTML',
+                ];
+                foreach ($options as $key => $value) {
+                    $params[$key] = $value;
+                }
+                if (isset($replyParameters['message_id'])) {
+                    $params['reply_parameters'] = json_encode(
+                        $replyParameters,
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                    );
+                }
+                if (isset($replyMarkup['inline_keyboard'])) {
+                    $params['reply_markup'] = json_encode(
+                        $replyMarkup,
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                    );
+                }
+
+                $requestOptions = [
+                    'connect_timeout' => min(1.0, (float) $this->config['timeout_seconds']),
+                    'timeout' => (float) $this->config['timeout_seconds'],
+                    'http_errors' => false,
+                ];
+                if ($upload) {
+                    $stream = @fopen($photo, 'rb');
+                    if (!is_resource($stream)) {
+                        throw new \RuntimeException('无法读取待上传的 Telegram 图片。');
+                    }
+                    $requestOptions['multipart'] = $this->multipartFields($params);
+                    $requestOptions['multipart'][] = [
+                        'name' => 'photo',
+                        'contents' => $stream,
+                        'filename' => basename($photo),
+                    ];
+                } else {
+                    $params['photo'] = $photo;
+                    $requestOptions['form_params'] = $params;
+                }
+
+                $response = $this->httpClient->request(
+                    'POST',
+                    $this->endpoint('sendPhoto'),
+                    $requestOptions
+                );
+                $payload = json_decode((string) $response->getBody(), true);
+                if (
+                    $response->getStatusCode() < 200
+                    || $response->getStatusCode() >= 300
+                    || !is_array($payload)
+                    || ($payload['ok'] ?? false) !== true
+                ) {
+                    $success = false;
+                    $this->reportFailure('Telegram API 返回图片发送失败', [
+                        'chat_id' => (string) $chatId,
+                        'photo_source' => $upload ? 'upload' : 'remote_or_file_id',
+                        'http_status' => $response->getStatusCode(),
+                        'duration_ms' => $this->durationMilliseconds($startedAt),
+                        'telegram_error_code' => is_array($payload) ? ($payload['error_code'] ?? null) : null,
+                        'telegram_description' => is_array($payload) ? ($payload['description'] ?? null) : null,
+                        'response_is_json' => is_array($payload),
+                        'photo_reference_hash' => hash('sha256', $photo),
+                        'caption_hash' => hash('sha256', $caption),
+                    ]);
+                    continue;
+                }
+
+                $result = (array) ($payload['result'] ?? []);
+                $this->reportActivity('Telegram 图片发送成功', [
+                    'chat_id' => (string) $chatId,
+                    'photo_source' => $upload ? 'upload' : 'remote_or_file_id',
+                    'http_status' => $response->getStatusCode(),
+                    'duration_ms' => $this->durationMilliseconds($startedAt),
+                    'telegram_message_id' => $result['message_id'] ?? null,
+                    'photo_reference_hash' => hash('sha256', $photo),
+                    'photo_bytes' => $upload ? (filesize($photo) ?: null) : null,
+                    'caption_bytes' => strlen($caption),
+                    'caption_hash' => hash('sha256', $caption),
+                    'reply_message_id' => $replyParameters['message_id'] ?? null,
+                    'button_count' => $this->buttonCount($replyMarkup),
+                    'has_spoiler' => (bool) ($options['has_spoiler'] ?? false),
+                ]);
+            } catch (Throwable $exception) {
+                $success = false;
+                $this->reportFailure('Telegram 图片请求发生异常', [
+                    'chat_id' => (string) $chatId,
+                    'photo_source' => $upload ? 'upload' : 'remote_or_file_id',
+                    'exception' => get_class($exception),
+                    'exception_message' => $this->redact($exception->getMessage()),
+                    'exception_code' => $exception->getCode(),
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                    'duration_ms' => $this->durationMilliseconds($startedAt),
+                    'photo_reference_hash' => hash('sha256', $photo),
+                    'caption_hash' => hash('sha256', $caption),
+                ]);
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            }
+        }
+
+        return $success;
+    }
+
+    /**
      * 记录通知链路失败；日志系统本身失败时静默返回，避免影响业务和队列重试。
      */
     public function reportFailure(string $message, array $context = []): void
@@ -334,6 +482,19 @@ final class TelegramNotificationSender
         }
 
         return $count;
+    }
+
+    private function multipartFields(array $params): array
+    {
+        $fields = [];
+        foreach ($params as $name => $value) {
+            $fields[] = [
+                'name' => (string) $name,
+                'contents' => is_bool($value) ? ($value ? 'true' : 'false') : (string) $value,
+            ];
+        }
+
+        return $fields;
     }
 
     private function durationMilliseconds(float $startedAt): float

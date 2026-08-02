@@ -14,6 +14,7 @@
 - 发送调用方构造的 Telegram HTML；
 - 发送带语言标签和复制按钮的代码块；
 - 发送自动格式化的 JSON，并组合应用名称和自定义标题；
+- 通过网络 URL、Telegram `file_id` 或本地文件发送图片和 HTML 图片说明；
 - 设置、删除和查询 Telegram Webhook；
 - 模块开启时成功操作写入 `telegram.log`，失败详情始终写入
   `telegram_failure.log`，Bot Token 自动脱敏。
@@ -107,6 +108,66 @@ FoundationTelegram::withTitle('接口异常')
     ->sendJson($data);
 ```
 
+## 发送图片
+
+网络图片 URL：
+
+```php
+FoundationTelegram::withToken($token)
+    ->to($chatId)
+    ->sendPhoto(
+        'https://example.com/orders/P1001.png',
+        '<b>订单异常</b>'
+    );
+```
+
+Telegram 已经返回过的 `file_id` 可以直接复用，避免重复上传：
+
+```php
+FoundationTelegram::to($chatId)->sendPhoto($photoFileId, '<b>订单截图</b>');
+```
+
+发送本地图片时使用独立的 `sendPhotoFile()`，包会校验文件是否可读、是否为图片、大小和
+尺寸，并使用 `multipart/form-data` 上传：
+
+```php
+FoundationTelegram::to($chatId)->sendPhotoFile(
+    storage_path('app/screenshots/P1001.png'),
+    '<b>本地订单截图</b>',
+    [
+        'show_caption_above_media' => true,
+        'has_spoiler' => false,
+        'disable_notification' => false,
+        'protect_content' => true,
+    ]
+);
+```
+
+图片消息继续支持回复和按钮：
+
+```php
+$caption = FoundationTelegram::format($data, 'json', [
+    'title' => '接口异常',
+]);
+
+FoundationTelegram::to($chatId)
+    ->replyTo($messageId, true)
+    ->withButtons([
+        ['text' => '查看订单', 'url' => $orderUrl],
+    ])
+    ->sendPhoto($photoUrl, $caption, [
+        'show_caption_above_media' => true,
+    ]);
+```
+
+图片说明按 Telegram HTML 解析，最多 1024 个解析后字符。图片最大 10 MB，宽度与高度
+之和不能超过 10000，宽高比不能超过 20。本地图片会在发送前校验；网络图片和
+`file_id` 由 Telegram API 校验。
+
+自定义图片发送与当前文字消息一样保持同步。成功操作写入 `telegram.log`，失败详情
+写入 `telegram_failure.log`；日志只记录图片引用 Hash、Caption Hash、大小和来源类型，
+不记录完整图片 URL、本地路径、Caption 或图片内容。
+
 ## Webhook 管理
 
 后台保存 Bot Token 时，可以继续通过 `withToken()` 按次覆盖：
@@ -162,6 +223,8 @@ format(mixed $content, string $format = 'text', array $options = []): string
 sendText(string $text): bool
 sendHtml(string $html): bool
 sendJson(mixed $data): bool
+sendPhoto(string $photo, string $caption = '', array $options = []): bool
+sendPhotoFile(string $path, string $caption = '', array $options = []): bool
 setWebhook(string $url, array $options = []): bool
 removeWebhook(bool $dropPendingUpdates = false): bool
 getWebhookInfo(): array
@@ -183,6 +246,10 @@ getWebhookInfo(): array
 - `sendText()` 会自动进行 HTML 转义；
 - `sendHtml()` 不转义内容，只能传入调用方确认安全的 Telegram HTML；
 - `sendJson()` 接受数组、对象或合法 JSON 字符串，自动缩进且中文不转义；
+- `sendPhoto()` 接受 HTTP(S) URL 或 Telegram `file_id`；
+- `sendPhotoFile()` 只用于本地图片上传，不会把本地路径发送给 Telegram；
+- 图片支持 `show_caption_above_media`、`has_spoiler`、`disable_notification`、
+  `protect_content` 四个布尔选项；
 - `withTitle('接口异常')->sendJson($data)` 的标题为 `[APP_NAME] 接口异常`；
 - `sendJson($data)` 的标题只有 `[APP_NAME]`；
 - 任意一个接收方发送失败时返回 `false`；

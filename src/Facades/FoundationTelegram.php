@@ -16,6 +16,8 @@ use Chencongbao\Foundation\Services\Notification\TelegramMessenger;
  * @method static bool sendText(string $text)
  * @method static bool sendHtml(string $html)
  * @method static bool sendJson(mixed $data)
+ * @method static bool sendPhoto(string $photo, string $caption = '', array $options = [])
+ * @method static bool sendPhotoFile(string $path, string $caption = '', array $options = [])
  * @method static bool setWebhook(string $url, array $options = [])
  * @method static bool removeWebhook(bool $dropPendingUpdates = false)
  * @method static array getWebhookInfo()

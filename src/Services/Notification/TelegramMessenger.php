@@ -17,6 +17,11 @@ use Stringable;
  */
 final class TelegramMessenger
 {
+    private const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+    private const PHOTO_MAX_DIMENSION_SUM = 10000;
+    private const PHOTO_MAX_RATIO = 20;
+    private const PHOTO_CAPTION_MAX_CHARACTERS = 1024;
+
     private ClientInterface $httpClient;
     private LogManager $logs;
     private array $config;
@@ -178,6 +183,65 @@ final class TelegramMessenger
     }
 
     /**
+     * 使用 HTTP(S) URL 或 Telegram file_id 发送图片。
+     */
+    public function sendPhoto(string $photo, string $caption = '', array $options = []): bool
+    {
+        $photo = trim($photo);
+        if ($photo === '') {
+            throw new InvalidArgumentException('Telegram 图片 URL 或 file_id 不能为空。');
+        }
+        if (filter_var($photo, FILTER_VALIDATE_URL) !== false) {
+            $scheme = strtolower((string) parse_url($photo, PHP_URL_SCHEME));
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                throw new InvalidArgumentException('Telegram 网络图片只支持 HTTP 或 HTTPS URL。');
+            }
+        }
+
+        $this->assertPhotoCaption($caption);
+
+        return $this->sender()->sendPhoto($photo, $caption, $this->normalizePhotoOptions($options));
+    }
+
+    /**
+     * 上传并发送本地图片。
+     */
+    public function sendPhotoFile(string $path, string $caption = '', array $options = []): bool
+    {
+        $path = trim($path);
+        $realPath = $path === '' ? false : realpath($path);
+        if ($realPath === false || !is_file($realPath) || !is_readable($realPath)) {
+            throw new InvalidArgumentException('Telegram 本地图片不存在或不可读。');
+        }
+
+        $bytes = filesize($realPath);
+        if ($bytes === false || $bytes <= 0 || $bytes > self::PHOTO_MAX_BYTES) {
+            throw new InvalidArgumentException('Telegram 本地图片必须大于 0 且不能超过 10 MB。');
+        }
+
+        $size = @getimagesize($realPath);
+        if (!is_array($size) || !isset($size[0], $size[1]) || $size[0] <= 0 || $size[1] <= 0) {
+            throw new InvalidArgumentException('Telegram 本地文件不是可识别的图片。');
+        }
+        $width = (int) $size[0];
+        $height = (int) $size[1];
+        if ($width + $height > self::PHOTO_MAX_DIMENSION_SUM) {
+            throw new InvalidArgumentException('Telegram 图片宽度与高度之和不能超过 10000。');
+        }
+        if (max($width, $height) / min($width, $height) > self::PHOTO_MAX_RATIO) {
+            throw new InvalidArgumentException('Telegram 图片宽高比不能超过 20。');
+        }
+
+        $this->assertPhotoCaption($caption);
+
+        return $this->sender()->sendPhotoFile(
+            $realPath,
+            $caption,
+            $this->normalizePhotoOptions($options)
+        );
+    }
+
+    /**
      * 设置当前机器人的 Telegram Webhook。
      *
      * 支持 ip_address、max_connections、allowed_updates、drop_pending_updates、
@@ -320,6 +384,47 @@ final class TelegramMessenger
         }
 
         return new TelegramNotificationSender($this->httpClient, $config, $this->logs);
+    }
+
+    private function normalizePhotoOptions(array $options): array
+    {
+        $allowed = [
+            'show_caption_above_media',
+            'has_spoiler',
+            'disable_notification',
+            'protect_content',
+        ];
+        $unknown = array_diff(array_keys($options), $allowed);
+        if ($unknown !== []) {
+            throw new InvalidArgumentException(
+                '不支持的 Telegram 图片参数：'.implode(', ', $unknown)
+            );
+        }
+
+        foreach ($options as $key => $value) {
+            if (!is_bool($value)) {
+                throw new InvalidArgumentException("Telegram 图片参数 {$key} 必须是布尔值。");
+            }
+        }
+
+        return $options;
+    }
+
+    private function assertPhotoCaption(string $caption): void
+    {
+        if (preg_match('//u', $caption) !== 1) {
+            throw new InvalidArgumentException('Telegram 图片说明必须是有效的 UTF-8。');
+        }
+
+        $plainText = html_entity_decode(
+            strip_tags($caption),
+            ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5,
+            'UTF-8'
+        );
+        preg_match_all('/./us', $plainText, $characters);
+        if (count($characters[0]) > self::PHOTO_CAPTION_MAX_CHARACTERS) {
+            throw new InvalidArgumentException('Telegram 图片说明不能超过 1024 个字符。');
+        }
     }
 
     private function normalizeButtonRows(array $buttons): array
