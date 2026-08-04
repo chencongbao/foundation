@@ -45,6 +45,7 @@ final class DailyLogCleanerTest extends TestCase
         self::assertFileExists($root.'/'.$oldestRetained.'/foundation/exception.log');
         self::assertFileExists($root.'/archive/readme.txt');
         self::assertFileExists($root.'/laravel.log');
+        self::assertSame(0666, fileperms($root.'/.foundation-log-retention.lock') & 0777);
     }
 
     public function test_zero_days_disables_cleanup(): void

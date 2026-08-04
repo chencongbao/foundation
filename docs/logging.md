@@ -35,6 +35,11 @@ Foundation 日志调用时清理。如果当天完全没有调用 Foundation 日
 不会写入完成标记，下一次相关操作会继续重试。该功能不依赖 Laravel Scheduler、Cron 或
 MongoDB TTL；修改保留天数后，即使当天已经清理过也会按新配置重新执行。
 
+锁文件只保存 `北京时间日期|保留天数`，不含业务或敏感数据。Foundation 创建或成功打开
+锁文件后会将权限设置为 `0666`，以兼容 `root` 执行 Artisan、`www` 运行 Swoole/Horizon
+等不同系统用户共同访问日志目录的部署方式。升级前已经存在的 `root:root 0644` 锁文件需
+手动执行一次 `chown www:www` 和 `chmod 664`，之后新版本会避免再次产生该问题。
+
 如果项目的按日日志根目录不在 `storage/logs`，可在 `config/foundation_custom.php`
 覆盖路径：
 

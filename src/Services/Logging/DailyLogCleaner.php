@@ -15,6 +15,7 @@ use Throwable;
 final class DailyLogCleaner
 {
     private const LOCK_FILE = '.foundation-log-retention.lock';
+    private const LOCK_PERMISSIONS = 0666;
 
     private array $config;
     private Closure $todayResolver;
@@ -83,10 +84,16 @@ final class DailyLogCleaner
         }
 
         $timezone = new DateTimeZone('Asia/Shanghai');
-        $lock = @fopen($root.DIRECTORY_SEPARATOR.self::LOCK_FILE, 'c+');
+        $lockPath = $root.DIRECTORY_SEPARATOR.self::LOCK_FILE;
+        $lock = @fopen($lockPath, 'c+');
         if (!is_resource($lock)) {
             return [0, false];
         }
+
+        // Artisan 常由 root 执行，而 Swoole/Horizon Worker 通常使用 www 用户。
+        // 锁文件只保存日期和保留天数，不含敏感数据；显式开放写权限可避免创建者
+        // 不同导致其他 Worker 无法更新完成标记。
+        @chmod($lockPath, self::LOCK_PERMISSIONS);
 
         try {
             if (!@flock($lock, LOCK_EX | LOCK_NB)) {
