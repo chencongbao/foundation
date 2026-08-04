@@ -25,18 +25,21 @@ final class FoundationLogger
     private LogManager $logs;
     private ExceptionNotifier $notifier;
     private array $config;
+    private ?DailyLogCleaner $logCleaner;
     /** @var array<string, LoggerInterface> */
     private array $moduleLoggers = [];
 
     public function __construct(
         LogManager $logs,
         ExceptionNotifier $notifier,
-        array $config
+        array $config,
+        ?DailyLogCleaner $logCleaner = null
     )
     {
         $this->logs = $logs;
         $this->notifier = $notifier;
         $this->config = $config;
+        $this->logCleaner = $logCleaner;
     }
 
     public function debug(string $module, string $message, array $context = []): void
@@ -62,6 +65,7 @@ final class FoundationLogger
     public function log(string $module, string $level, string $message, array $context = []): void
     {
         $module = $this->moduleName($module);
+        $this->cleanupExpiredLogs();
         $settings = $this->moduleSettings($module);
         if (!$this->shouldLog($settings, $level)) {
             return;
@@ -114,6 +118,7 @@ final class FoundationLogger
     public function exception(string $module, Throwable $exception, array $context = []): void
     {
         $module = $this->moduleName($module);
+        $this->cleanupExpiredLogs();
         $safeContext = $this->sanitize($context);
 
         try {
@@ -123,6 +128,15 @@ final class FoundationLogger
         }
 
         $this->notifier->notify($module, $exception, $safeContext);
+    }
+
+    private function cleanupExpiredLogs(): void
+    {
+        try {
+            $this->logCleaner?->cleanup();
+        } catch (Throwable) {
+            // 日志保留清理不能影响业务日志和异常通知。
+        }
     }
 
     private function writeExceptionLog(string $module, Throwable $exception, array $context): void

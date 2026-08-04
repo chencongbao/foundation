@@ -4,6 +4,7 @@ namespace Chencongbao\Foundation\Services\Logging;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Closure;
 use Throwable;
 
 /**
@@ -16,10 +17,16 @@ final class DailyLogCleaner
     private const LOCK_FILE = '.foundation-log-retention.lock';
 
     private array $config;
+    private Closure $todayResolver;
+    private ?string $completedRunKey = null;
 
-    public function __construct(array $config)
+    public function __construct(array $config, ?Closure $todayResolver = null)
     {
         $this->config = $config;
+        $this->todayResolver = $todayResolver ?? static fn (): DateTimeImmutable => new DateTimeImmutable(
+            'today',
+            new DateTimeZone('Asia/Shanghai')
+        );
     }
 
     /**
@@ -34,15 +41,37 @@ final class DailyLogCleaner
         }
 
         try {
-            return $this->cleanupSafely($configuredPath, $days);
+            $today = ($this->todayResolver)()->setTimezone(new DateTimeZone('Asia/Shanghai'));
+            $today = $today->setTime(0, 0);
+            $runKey = $today->format('Y-m-d').'|'.$days;
+            if ($this->completedRunKey === $runKey) {
+                return 0;
+            }
+
+            [$deleted, $completed] = $this->cleanupSafely(
+                $configuredPath,
+                $days,
+                $today,
+                $runKey
+            );
+            if ($completed) {
+                $this->completedRunKey = $runKey;
+            }
+
+            return $deleted;
         } catch (Throwable) {
-            // 日志清理失败不能阻断 Web 请求、命令或 Queue Worker 启动。
+            // 日志清理失败不能阻断业务；不缓存完成状态，下一次日志操作会继续重试。
             return 0;
         }
     }
 
-    private function cleanupSafely(string $configuredPath, int $days): int
-    {
+    /** @return array{0: int, 1: bool} */
+    private function cleanupSafely(
+        string $configuredPath,
+        int $days,
+        DateTimeImmutable $today,
+        string $runKey
+    ): array {
         $root = realpath($configuredPath);
         if (
             $root === false
@@ -50,29 +79,28 @@ final class DailyLogCleaner
             || is_link($configuredPath)
             || $this->isUnsafeRoot($root)
         ) {
-            return 0;
+            return [0, false];
         }
 
         $timezone = new DateTimeZone('Asia/Shanghai');
-        $today = new DateTimeImmutable('today', $timezone);
-        $runKey = $today->format('Y-m-d').'|'.$days;
         $lock = @fopen($root.DIRECTORY_SEPARATOR.self::LOCK_FILE, 'c+');
         if (!is_resource($lock)) {
-            return 0;
+            return [0, false];
         }
 
         try {
             if (!@flock($lock, LOCK_EX | LOCK_NB)) {
-                return 0;
+                return [0, false];
             }
 
             rewind($lock);
             if (trim((string) stream_get_contents($lock)) === $runKey) {
-                return 0;
+                return [0, true];
             }
 
             $cutoff = $today->modify('-'.($days - 1).' days');
             $deleted = 0;
+            $completed = true;
             foreach ((array) scandir($root) as $entry) {
                 if (!$this->isExpiredDateDirectory($root, (string) $entry, $cutoff, $timezone)) {
                     continue;
@@ -81,15 +109,19 @@ final class DailyLogCleaner
                 $directory = $root.DIRECTORY_SEPARATOR.$entry;
                 if ($this->deleteDirectory($directory)) {
                     $deleted++;
+                } else {
+                    $completed = false;
                 }
             }
 
-            rewind($lock);
-            @ftruncate($lock, 0);
-            @fwrite($lock, $runKey);
-            @fflush($lock);
+            if ($completed) {
+                rewind($lock);
+                @ftruncate($lock, 0);
+                $written = @fwrite($lock, $runKey);
+                $completed = $written === strlen($runKey) && @fflush($lock);
+            }
 
-            return $deleted;
+            return [$deleted, $completed];
         } finally {
             @flock($lock, LOCK_UN);
             @fclose($lock);

@@ -22,9 +22,15 @@ Foundation 会自动清理 `storage/logs` 下名称严格为 `YYYY-MM-DD` 的过
 FOUNDATION_LOG_RETENTION_DAYS=30
 ```
 
-设为 `0` 可关闭自动清理。清理在 Provider 启动时触发，通过文件锁确保每天最多实际扫描
-一次，不依赖 Laravel Scheduler、Cron 或 MongoDB TTL。修改保留天数后，即使当天已经
-清理过也会按新配置重新执行。
+设为 `0` 可关闭自动清理。Provider 启动时会检查一次；Foundation 日志和 Telegram
+功能发生操作时也会触发检查。Swoole、Octane 和 Queue Worker 等常驻进程跨过北京时间
+零点后，无需重启便会在下一次相关操作时清理。即使某个普通日志模块处于关闭状态，调用
+`FoundationLogger` 时仍会进行清理检查。
+
+进程内会缓存当天已完成状态，后续日志操作不会反复访问锁文件；多个 PHP 进程之间则通过
+`storage/logs/.foundation-log-retention.lock` 保证同一天最多完成一次扫描。删除目录失败时
+不会写入完成标记，下一次相关操作会继续重试。该功能不依赖 Laravel Scheduler、Cron 或
+MongoDB TTL；修改保留天数后，即使当天已经清理过也会按新配置重新执行。
 
 如果项目的按日日志根目录不在 `storage/logs`，可在 `config/foundation_custom.php`
 覆盖路径：

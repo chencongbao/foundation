@@ -108,6 +108,36 @@ final class DailyLogCleanerTest extends TestCase
         self::assertDirectoryDoesNotExist($root.'/'.$secondDate);
     }
 
+    public function test_long_lived_process_runs_again_after_beijing_date_changes(): void
+    {
+        $root = $this->temporaryDirectory();
+        $today = new DateTimeImmutable('2026-08-04', new DateTimeZone('Asia/Shanghai'));
+        $todayResolver = static function () use (&$today): DateTimeImmutable {
+            return $today;
+        };
+        $cleaner = new DailyLogCleaner([
+            'days' => 3,
+            'path' => $root,
+        ], $todayResolver);
+
+        $this->put($root.'/2026-08-01/first.log', 'delete');
+        self::assertSame(1, $cleaner->cleanup());
+        self::assertSame('2026-08-04|3', trim((string) file_get_contents(
+            $root.'/.foundation-log-retention.lock'
+        )));
+
+        $this->put($root.'/2026-08-01/created-after-cleanup.log', 'keep-today');
+        self::assertSame(0, $cleaner->cleanup());
+        self::assertFileExists($root.'/2026-08-01/created-after-cleanup.log');
+
+        $today = new DateTimeImmutable('2026-08-05', new DateTimeZone('Asia/Shanghai'));
+        self::assertSame(1, $cleaner->cleanup());
+        self::assertDirectoryDoesNotExist($root.'/2026-08-01');
+        self::assertSame('2026-08-05|3', trim((string) file_get_contents(
+            $root.'/.foundation-log-retention.lock'
+        )));
+    }
+
     private function temporaryDirectory(): string
     {
         $directory = sys_get_temp_dir().'/foundation-log-cleaner-'.bin2hex(random_bytes(8));

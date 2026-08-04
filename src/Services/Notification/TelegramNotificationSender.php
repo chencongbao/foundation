@@ -2,27 +2,34 @@
 
 namespace Chencongbao\Foundation\Services\Notification;
 
+use Chencongbao\Foundation\Services\Logging\DailyLogCleaner;
+use Chencongbao\Foundation\Services\Logging\ReadableLogFormatter;
 use Throwable;
 use Illuminate\Log\LogManager;
 use GuzzleHttp\ClientInterface;
 use Psr\Log\LoggerInterface;
-use Chencongbao\Foundation\Services\Logging\ReadableLogFormatter;
 
 final class TelegramNotificationSender
 {
     private ClientInterface $httpClient;
     private array $config;
     private ?LogManager $logs;
+    private ?DailyLogCleaner $logCleaner;
     private ?LoggerInterface $activityLogger = null;
     private ?string $activityLoggerDate = null;
     private ?LoggerInterface $failureLogger = null;
     private ?string $failureLoggerDate = null;
 
-    public function __construct(ClientInterface $httpClient, array $config, ?LogManager $logs = null)
-    {
+    public function __construct(
+        ClientInterface $httpClient,
+        array $config,
+        ?LogManager $logs = null,
+        ?DailyLogCleaner $logCleaner = null
+    ) {
         $this->httpClient = $httpClient;
         $this->config = $config;
         $this->logs = $logs;
+        $this->logCleaner = $logCleaner;
     }
 
     public function configured(): bool
@@ -39,6 +46,7 @@ final class TelegramNotificationSender
      */
     public function call(string $method, array $params = []): mixed
     {
+        $this->cleanupExpiredLogs();
         if (trim((string) ($this->config['bot_token'] ?? '')) === '') {
             $this->reportFailure('Telegram Bot Token 未配置', [
                 'method' => $method,
@@ -102,6 +110,7 @@ final class TelegramNotificationSender
 
     public function send(string $message): bool
     {
+        $this->cleanupExpiredLogs();
         if (!$this->configured()) {
             $this->reportFailure('Telegram 通知配置不完整', [
                 'telegram_enabled' => ($this->config['enabled'] ?? false) === true,
@@ -209,6 +218,7 @@ final class TelegramNotificationSender
         array $options,
         bool $upload
     ): bool {
+        $this->cleanupExpiredLogs();
         if (!$this->configured()) {
             $this->reportFailure('Telegram 图片通知配置不完整', [
                 'telegram_enabled' => ($this->config['enabled'] ?? false) === true,
@@ -333,6 +343,15 @@ final class TelegramNotificationSender
         }
 
         return $success;
+    }
+
+    private function cleanupExpiredLogs(): void
+    {
+        try {
+            $this->logCleaner?->cleanup();
+        } catch (Throwable) {
+            // 日志保留清理不能影响 Telegram 调用。
+        }
     }
 
     /**

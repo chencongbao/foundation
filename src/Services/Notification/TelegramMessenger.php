@@ -2,6 +2,7 @@
 
 namespace Chencongbao\Foundation\Services\Notification;
 
+use Chencongbao\Foundation\Services\Logging\DailyLogCleaner;
 use GuzzleHttp\ClientInterface;
 use Illuminate\Log\LogManager;
 use InvalidArgumentException;
@@ -25,6 +26,7 @@ final class TelegramMessenger
     private ClientInterface $httpClient;
     private LogManager $logs;
     private array $config;
+    private ?DailyLogCleaner $logCleaner;
     private ?string $tokenOverride = null;
     private ?array $chatIdsOverride = null;
     private ?array $replyParametersOverride = null;
@@ -32,11 +34,16 @@ final class TelegramMessenger
     private ?string $titleOverride = null;
     private bool $withoutAppName = false;
 
-    public function __construct(ClientInterface $httpClient, LogManager $logs, array $config)
-    {
+    public function __construct(
+        ClientInterface $httpClient,
+        LogManager $logs,
+        array $config,
+        ?DailyLogCleaner $logCleaner = null
+    ) {
         $this->httpClient = $httpClient;
         $this->logs = $logs;
         $this->config = $config;
+        $this->logCleaner = $logCleaner;
     }
 
     /**
@@ -383,7 +390,12 @@ final class TelegramMessenger
             $config['reply_markup'] = $this->replyMarkupOverride;
         }
 
-        return new TelegramNotificationSender($this->httpClient, $config, $this->logs);
+        return new TelegramNotificationSender(
+            $this->httpClient,
+            $config,
+            $this->logs,
+            $this->logCleaner
+        );
     }
 
     private function normalizePhotoOptions(array $options): array

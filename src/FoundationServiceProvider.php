@@ -37,6 +37,10 @@ class FoundationServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/foundation_custom.php', 'foundation_custom');
         $this->applyProjectConfigOverrides();
 
+        $this->app->singleton(DailyLogCleaner::class, static fn ($app): DailyLogCleaner => new DailyLogCleaner(
+            (array) $app['config']->get('foundation_log.retention', [])
+        ));
+
         $this->app->singleton(ClientIpResolver::class, static fn ($app): ClientIpResolver => new TrustedProxyClientIpResolver(
             (array) $app['config']->get('client_ip', []),
             $app->make(FoundationLogger::class)
@@ -45,12 +49,14 @@ class FoundationServiceProvider extends ServiceProvider
         $this->app->singleton(TelegramNotificationSender::class, static fn ($app): TelegramNotificationSender => new TelegramNotificationSender(
             new Client(),
             self::telegramConfig($app),
-            $app->make(LogManager::class)
+            $app->make(LogManager::class),
+            $app->make(DailyLogCleaner::class)
         ));
         $this->app->singleton(TelegramMessenger::class, static fn ($app): TelegramMessenger => new TelegramMessenger(
             new Client(),
             $app->make(LogManager::class),
-            self::telegramConfig($app)
+            self::telegramConfig($app),
+            $app->make(DailyLogCleaner::class)
         ));
         $this->app->singleton(TelegramWebhookHandler::class, static fn ($app): TelegramWebhookHandler => new TelegramWebhookHandler(
             $app->make(CacheRepository::class),
@@ -69,12 +75,9 @@ class FoundationServiceProvider extends ServiceProvider
         $this->app->singleton(FoundationLogger::class, static fn ($app): FoundationLogger => new FoundationLogger(
             $app->make(LogManager::class),
             $app->make(ExceptionNotifier::class),
-            (array) $app['config']->get('foundation_log', [])
+            (array) $app['config']->get('foundation_log', []),
+            $app->make(DailyLogCleaner::class)
         ));
-        $this->app->singleton(DailyLogCleaner::class, static fn ($app): DailyLogCleaner => new DailyLogCleaner(
-            (array) $app['config']->get('foundation_log.retention', [])
-        ));
-
         $this->app->singleton(TronRpcClient::class, static fn ($app): TronRpcClient => new TronRpcClient(
             (array) $app['config']->get('tron_rpc.endpoints', []),
             (string) $app['config']->get('tron_rpc.app_id', 'robots'),
