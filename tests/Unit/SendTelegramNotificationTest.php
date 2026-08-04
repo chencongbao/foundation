@@ -12,6 +12,7 @@ use Psr\Http\Message\RequestInterface;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Chencongbao\Foundation\Jobs\SendTelegramNotification;
 use Chencongbao\Foundation\Exceptions\TelegramTransportException;
+use Chencongbao\Foundation\Services\Logging\ReadableLogFormatter;
 use Chencongbao\Foundation\Services\Notification\TelegramNotificationSender;
 
 class SendTelegramNotificationTest extends TestCase
@@ -70,7 +71,7 @@ class SendTelegramNotificationTest extends TestCase
             ->once()
             ->with([
                 'driver' => 'single',
-                'path' => '/tmp/logs/'.date('Y-m-d').'/foundation/telegram_failure.log',
+                'path' => '/tmp/logs/'.substr(ReadableLogFormatter::beijingTime(), 0, 10).'/foundation/telegram_failure.log',
                 'level' => 'error',
             ])
             ->andReturn($logger);
@@ -118,7 +119,7 @@ class SendTelegramNotificationTest extends TestCase
             ->once()
             ->with([
                 'driver' => 'single',
-                'path' => '/tmp/logs/'.date('Y-m-d').'/foundation/telegram.log',
+                'path' => '/tmp/logs/'.substr(ReadableLogFormatter::beijingTime(), 0, 10).'/foundation/telegram.log',
                 'level' => 'info',
             ])
             ->andReturn($logger);

@@ -11,6 +11,7 @@ use Psr\Log\LoggerInterface;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Chencongbao\Foundation\Contracts\ExceptionNotifier;
 use Chencongbao\Foundation\Services\Logging\FoundationLogger;
+use Chencongbao\Foundation\Services\Logging\ReadableLogFormatter;
 
 class FoundationLoggerTest extends TestCase
 {
@@ -290,7 +291,7 @@ class FoundationLoggerTest extends TestCase
             ->once()
             ->with([
                 'driver' => 'single',
-                'path' => '/tmp/logs/'.date('Y-m-d').'/foundation/client_ip.log',
+                'path' => '/tmp/logs/'.substr(ReadableLogFormatter::beijingTime(), 0, 10).'/foundation/client_ip.log',
                 'level' => 'info',
             ])
             ->andReturn($channel);

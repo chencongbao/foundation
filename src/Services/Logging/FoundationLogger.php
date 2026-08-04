@@ -107,12 +107,17 @@ final class FoundationLogger
     {
         $path = (string) ($settings['path'] ?? '');
 
-        return str_contains($path, '{date}') ? $module.'|'.date('Y-m-d') : $module;
+        return str_contains($path, '{date}') ? $module.'|'.$this->beijingDate() : $module;
     }
 
     private function datedPath(string $path): string
     {
-        return str_replace('{date}', date('Y-m-d'), $path);
+        return str_replace('{date}', $this->beijingDate(), $path);
+    }
+
+    private function beijingDate(): string
+    {
+        return substr(ReadableLogFormatter::beijingTime(), 0, 10);
     }
 
     public function exception(string $module, Throwable $exception, array $context = []): void

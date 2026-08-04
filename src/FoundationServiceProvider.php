@@ -2,7 +2,6 @@
 
 namespace Chencongbao\Foundation;
 
-use Throwable;
 use GuzzleHttp\Client;
 use Illuminate\Log\LogManager;
 use Illuminate\Contracts\Bus\Dispatcher;
@@ -49,14 +48,12 @@ class FoundationServiceProvider extends ServiceProvider
         $this->app->singleton(TelegramNotificationSender::class, static fn ($app): TelegramNotificationSender => new TelegramNotificationSender(
             new Client(),
             self::telegramConfig($app),
-            $app->make(LogManager::class),
-            $app->make(DailyLogCleaner::class)
+            $app->make(LogManager::class)
         ));
         $this->app->singleton(TelegramMessenger::class, static fn ($app): TelegramMessenger => new TelegramMessenger(
             new Client(),
             $app->make(LogManager::class),
-            self::telegramConfig($app),
-            $app->make(DailyLogCleaner::class)
+            self::telegramConfig($app)
         ));
         $this->app->singleton(TelegramWebhookHandler::class, static fn ($app): TelegramWebhookHandler => new TelegramWebhookHandler(
             $app->make(CacheRepository::class),
@@ -91,12 +88,6 @@ class FoundationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        try {
-            $this->app->make(DailyLogCleaner::class)->cleanup();
-        } catch (Throwable) {
-            // 自动清理失败不能阻断宿主项目启动。
-        }
-
         $this->publishes([
             __DIR__.'/../config/foundation_custom.php' => config_path('foundation_custom.php'),
         ], 'foundation-custom-config');

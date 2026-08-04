@@ -6,7 +6,8 @@ return [
     /*
      * 自动清理 storage/logs 下所有 YYYY-MM-DD 日期目录。
      * days 表示包含今天在内保留的自然日数量；设为 0 可关闭自动清理。
-     * Provider 启动及 Foundation/Telegram 操作会触发检查；常驻进程跨天后会自动重检。
+     * 仅在 FoundationLogger 写普通日志或处理异常时触发检查。
+     * 当天没有 Foundation 日志调用时不主动运行，下次调用时自动补做。
      * 文件锁保证多进程每天最多完成一次清理，不需要定时任务。
      */
     'retention' => [
